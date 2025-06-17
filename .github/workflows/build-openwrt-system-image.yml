@@ -15,7 +15,7 @@ on:
         default: "v23.05.5"
         type: choice
         options:
-          - openwrt-main
+          - openwrt-v23.05.5
           - lede-master
           - immortalwrt-master
       openwrt_board:
