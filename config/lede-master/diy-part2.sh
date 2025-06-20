@@ -69,14 +69,14 @@ git clone https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter
 echo "CONFIG_PACKAGE_luci-app-oaf=y" >>.config
 # ------------------------------- Other ends -------------------------------
 # 进入package/libs目录
-cd /builder/openwrt/package/libs
+#cd /builder/openwrt/package/libs
 
 # 更新elfutils配置
-rm -rf elfutils
-git clone https://sourceware.org/git/elfutils.git elfutils
+rm -rf package/libs/elfutils
+git clone https://sourceware.org/git/elfutils.git   package/libs/elfutils
 
 # 或者修改Makefile中的版本号为最新版本
-cd openwrt/
+#cd openwrt/
 # 搜索并安装libelf包
 ./scripts/feeds search libelf
 # 输出类似：libelf - ELF file format library
