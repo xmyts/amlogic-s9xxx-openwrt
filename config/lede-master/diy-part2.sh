@@ -76,3 +76,8 @@ rm -rf elfutils
 git clone https://sourceware.org/git/elfutils.git elfutils
 
 # 或者修改Makefile中的版本号为最新版本
+cd openwrt/
+# 搜索并安装libelf包
+./scripts/feeds search libelf
+# 输出类似：libelf - ELF file format library
+./scripts/feeds install libelf
