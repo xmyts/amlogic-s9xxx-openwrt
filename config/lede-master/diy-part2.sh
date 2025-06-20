@@ -68,8 +68,11 @@ merge_package https://github.com/v2rayA/v2raya-openwrt v2raya-openwrt/luci-app-v
 git clone https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter    
 echo "CONFIG_PACKAGE_luci-app-oaf=y" >>.config
 # ------------------------------- Other ends -------------------------------
-./scripts/feeds update -a
-./scripts/feeds install -a
+# 进入package/libs目录
+cd /builder/openwrt/package/libs
 
-# 自动修复配置依赖
-make defconfig  
+# 更新elfutils配置
+rm -rf elfutils
+git clone https://sourceware.org/git/elfutils.git elfutils
+
+# 或者修改Makefile中的版本号为最新版本
