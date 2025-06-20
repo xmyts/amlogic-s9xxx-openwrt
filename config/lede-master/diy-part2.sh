@@ -64,9 +64,7 @@ merge_package https://github.com/v2rayA/v2raya-openwrt v2raya-openwrt/v2raya
 merge_package https://github.com/v2rayA/v2raya-openwrt v2raya-openwrt/luci-app-v2raya
 
 
-#OpenAppFilter
-git clone https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter    
-echo "CONFIG_PACKAGE_luci-app-oaf=y" >>.config
+
 # ------------------------------- Other ends -------------------------------
 # 进入package/libs目录
 #cd /builder/openwrt/package/libs
@@ -75,9 +73,4 @@ echo "CONFIG_PACKAGE_luci-app-oaf=y" >>.config
 rm -rf package/libs/elfutils
 git clone https://sourceware.org/git/elfutils.git   package/libs/elfutils
 
-# 或者修改Makefile中的版本号为最新版本
-#cd openwrt/
-# 搜索并安装libelf包
-./scripts/feeds search libelf
-# 输出类似：libelf - ELF file format library
-./scripts/feeds install libelf
+
