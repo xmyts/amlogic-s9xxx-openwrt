@@ -27,50 +27,15 @@ echo "DISTRIB_SOURCECODE='lede'" >>package/base-files/files/etc/openwrt_release
 # ------------------------------- Main source ends -------------------------------
 
 # ------------------------------- Other started -------------------------------
-#
-# Add luci-app-amlogic
-rm -rf package/luci-app-amlogic
-git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
-#
-# Apply patch
-# git apply ../config/patches/{0001*,0002*}.patch --directory=feeds/luci
-#
-# 微信推送
-rm -rf feeds/kenzo/luci-app-wechatpush
-rm -rf feeds/luci/applications/luci-app-serverchan
-git clone -b openwrt-18.06 https://github.com/tty228/luci-app-serverchan.git feeds/luci/applications/luci-app-serverchan
+sed -i '1i src-git kenzo https://github.com/kenzok8/openwrt-packages' feeds.conf.default
+sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
 
-# luci-app-adguardhome
-rm -rf feeds/kenzo/luci-app-adguardhome
-git clone https://github.com/Zane-E/luci-app-adguardhome.git feeds/kenzo/luci-app-adguardhome
 
-# filebrowser
-rm -rf feeds/kenzo/luci-app-filebrowser
-git clone -b 18.06 https://github.com/xiaozhuai/luci-app-filebrowser feeds/kenzo/luci-app-filebrowser
-merge_package https://github.com/Lienol/openwrt-package openwrt-package/luci-app-filebrowser
 
-# mosdns
-rm -rf feeds/kenzo/luci-app-mosdns
-rm -rf feeds/packages/net/mosdns
-rm -rf feeds/luci/applications/luci-app-mosdns
-merge_package https://github.com/sbwml/luci-app-mosdns luci-app-mosdns
-merge_package https://github.com/sbwml/luci-app-mosdns luci-app-mosdns/mosdns
-
-# poweroff
-git clone https://github.com/esirplayground/luci-app-poweroff.git
-
-# v2raya   代理服务器
-merge_package https://github.com/v2rayA/v2raya-openwrt v2raya-openwrt/v2raya
-merge_package https://github.com/v2rayA/v2raya-openwrt v2raya-openwrt/luci-app-v2raya
 
 
 
 # ------------------------------- Other ends -------------------------------
-# 进入package/libs目录
-#cd /builder/openwrt/package/libs
 
-# 更新elfutils配置
-rm -rf package/libs/elfutils
-git clone https://sourceware.org/git/elfutils.git   package/libs/elfutils
 
 
