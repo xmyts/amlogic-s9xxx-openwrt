@@ -25,7 +25,12 @@ echo "DISTRIB_SOURCECODE='lede'" >>package/base-files/files/etc/openwrt_release
 # sed -i 's#openwrt.proxy.ustclug.org#mirrors.bfsu.edu.cn\\/openwrt#' package/lean/default-settings/files/zzz-default-settings
 #
 # ------------------------------- Main source ends -------------------------------
-
+# Add luci-app-amlogic
+rm -rf package/luci-app-amlogic
+git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
+#
+# Apply patch
+# git apply ../config/patches/{0001*,0002*}.patch --directory=feeds/luci
 # ------------------------------- Other started -------------------------------
 sed -i '1i src-git kenzo https://github.com/kenzok8/openwrt-packages' feeds.conf.default
 sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
