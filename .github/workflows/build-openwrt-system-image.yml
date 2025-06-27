@@ -9,10 +9,10 @@ on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
-      source_branch:
+      source_branch:openwrt-23.05
         description: "Select the source branch"
         required: false
-        default: "v23.05.5"
+        default: "main"
         type: choice
         options:
           - openwrt-main
@@ -299,7 +299,7 @@ jobs:
           # Set up compilation source code
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
               REPO_URL="https://github.com/openwrt/openwrt"
-              REPO_BRANCH="openwrt-23.05"
+              REPO_BRANCH="main"
               TAGS_NAME="official"
           elif [[ "${{ inputs.source_branch }}" == *"lede"* ]]; then
               REPO_URL="https://github.com/coolsnowwolf/lede"
@@ -328,14 +328,25 @@ jobs:
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Load custom feeds
-        run: |
-          [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
-          chmod +x ${DIY_P1_SH}
-          cd openwrt/
-          ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+  run: |
+    [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
+    cd openwrt/
+    sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
+    sed -i '2i src-git small https://github.com/kenzok8/small' feeds.conf.default
+    chmod +x ${DIY_P1_SH}
+    ${GITHUB_WORKSPACE}/${DIY_P1_SH}
 
-      - name: Update feeds
-        run: cd openwrt/ && ./scripts/feeds update -a
+     - name: Update feeds
+  run: |
+    cd openwrt/
+    ./scripts/feeds update -a
+    rm -rf feeds/luci/applications/luci-app-adguardhome
+    rm -rf feeds/luci/applications/luci-app-qbittorrent
+    rm -rf feeds/luci/applications/luci-app-alist
+    rm -rf feeds/luci/applications/luci-app-docker
+    rm -rf feeds/luci/applications/luci-app-dockerman
+    rm -rf feeds/luci/applications/luci-app-clouddrive2
+    rm -rf feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}
 
       - name: Install feeds
         run: cd openwrt/ && ./scripts/feeds install -a
