@@ -251,7 +251,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Initialization environment
+- name: Initialization environment
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -262,8 +262,13 @@ jobs:
           sudo swapoff -a
           sudo rm -f /swapfile /mnt/swapfile
           sudo -E apt-get -y update
+          
+          # 清理旧软件包（原命令后添加新安装命令）
           sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
-          sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt)
+          
+          # 添加新的依赖安装命令（整合到原安装命令中）
+          sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt) build-essential gcc-multilib g++-multilib texinfo flex bison libncurses5-dev wget unzip
+          
           sudo -E systemctl daemon-reload
           #sudo -E apt-get -y full-upgrade
           sudo -E apt-get -y autoremove --purge
