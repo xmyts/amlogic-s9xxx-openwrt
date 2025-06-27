@@ -9,7 +9,7 @@ on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
-      source_branch:openwrt-23.05
+      source_branch:openwrt-main
         description: "Select the source branch"
         required: false
         default: "main"
