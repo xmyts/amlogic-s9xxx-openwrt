@@ -43,3 +43,14 @@ sed -i '/qdbus \\/d' feeds/packages/libs/qttools/Makefile
 # 添加 Qt5 兼容配置
 echo "CONFIG_PACKAGE_qt5base=y" >> .config
 echo "CONFIG_PACKAGE_qt5tools=y" >> .config
+
+# 确保工具链目录存在
+if [ ! -d staging_dir/toolchain-* ]; then
+    make toolchain/install -j$(nproc) V=s
+fi
+
+# 修复 musl 库路径
+TOOLCHAIN_DIR=$(ls -d staging_dir/toolchain-* | head -1)
+if [ -n "$TOOLCHAIN_DIR" ] && [ ! -f $TOOLCHAIN_DIR/lib/ld-musl-*.so* ]; then
+    cp -f $TOOLCHAIN_DIR/usr/lib/ld-musl-*.so* $TOOLCHAIN_DIR/lib/
+fi
