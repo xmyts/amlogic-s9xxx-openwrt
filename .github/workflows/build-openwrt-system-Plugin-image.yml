@@ -365,29 +365,37 @@ jobs:
           cd openwrt/
           ${GITHUB_WORKSPACE}/${DIY_P2_SH}
 
-# ============== 新增步骤 1: 修复 qttools 依赖 ==============
-      - name: Fix qttools dependencies
+      # ============== 修复 qttools 和工具链问题 ==============
+      - name: Fix dependencies and toolchain issues
         run: |
           cd openwrt/
-          # 确保 Qt6 DBus 支持已启用
-          sed -i 's/CONFIG_PACKAGE_qt6base-dbus=n/CONFIG_PACKAGE_qt6base-dbus=y/' .config
-          # 禁用 qttools 的 qdbus 组件
+          
+          # 修复 qttools 依赖
+          sed -i 's/CONFIG_PACKAGE_qt6base-dbus=n/CONFIG_PACKAGE_qt6base-dbus=y/' .config || true
           echo "CONFIG_PACKAGE_qttools_qdbus=n" >> .config
-          # 添加 Qt5 兼容性支持
           echo "CONFIG_PACKAGE_qt5base=y" >> .config
           echo "CONFIG_PACKAGE_qt5tools=y" >> .config
+          
+          # 修复工具链问题 - 确保 musl 库存在
+          if [ ! -d staging_dir/toolchain-* ]; then
+            make toolchain/install -j$(nproc) V=s
+          fi
+          
+          # 同步配置
+          make defconfig
 
-      # ============== 新增步骤 2: 确保编译顺序 ==============
-      - name: Ensure build order
+      # ============== 重建工具链 ==============
+      - name: Rebuild toolchain
         run: |
           cd openwrt/
-          # 先编译 Qt6 基础库
-          make package/qt6base/{clean,compile} -j$(nproc) V=s || true
-          # 检查库文件是否存在
-          if [ ! -f staging_dir/target-*/usr/lib/libQt6DBus.a ]; then
-            echo "::warning::Qt6 DBus library missing, forcing rebuild"
-            make package/qt6base/clean
-            make package/qt6base/compile -j1 V=s
+          make toolchain/clean
+          make toolchain/compile -j$(nproc) V=s
+          make toolchain/install -j$(nproc) V=s
+          
+          # 验证 musl 库存在
+          if [ ! -f staging_dir/toolchain-*/lib/ld-musl-*.so* ]; then
+            echo "::error::Musl libraries still missing after toolchain rebuild"
+            exit 1
           fi
 
       - name: Download package
