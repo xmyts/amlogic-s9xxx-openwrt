@@ -365,6 +365,31 @@ jobs:
           cd openwrt/
           ${GITHUB_WORKSPACE}/${DIY_P2_SH}
 
+# ============== 新增步骤 1: 修复 qttools 依赖 ==============
+      - name: Fix qttools dependencies
+        run: |
+          cd openwrt/
+          # 确保 Qt6 DBus 支持已启用
+          sed -i 's/CONFIG_PACKAGE_qt6base-dbus=n/CONFIG_PACKAGE_qt6base-dbus=y/' .config
+          # 禁用 qttools 的 qdbus 组件
+          echo "CONFIG_PACKAGE_qttools_qdbus=n" >> .config
+          # 添加 Qt5 兼容性支持
+          echo "CONFIG_PACKAGE_qt5base=y" >> .config
+          echo "CONFIG_PACKAGE_qt5tools=y" >> .config
+
+      # ============== 新增步骤 2: 确保编译顺序 ==============
+      - name: Ensure build order
+        run: |
+          cd openwrt/
+          # 先编译 Qt6 基础库
+          make package/qt6base/{clean,compile} -j$(nproc) V=s || true
+          # 检查库文件是否存在
+          if [ ! -f staging_dir/target-*/usr/lib/libQt6DBus.a ]; then
+            echo "::warning::Qt6 DBus library missing, forcing rebuild"
+            make package/qt6base/clean
+            make package/qt6base/compile -j1 V=s
+          fi
+
       - name: Download package
         id: package
         run: |
