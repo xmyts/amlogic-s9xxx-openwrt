@@ -25,19 +25,21 @@ echo "DISTRIB_SOURCECODE='lede'" >>package/base-files/files/etc/openwrt_release
 # sed -i 's#openwrt.proxy.ustclug.org#mirrors.bfsu.edu.cn\\/openwrt#' package/lean/default-settings/files/zzz-default-settings
 #
 # ------------------------------- Main source ends -------------------------------
+
+# ------------------------------- Other started -------------------------------
+#
 # Add luci-app-amlogic
 rm -rf package/luci-app-amlogic
 git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 #
 # Apply patch
 # git apply ../config/patches/{0001*,0002*}.patch --directory=feeds/luci
-# ------------------------------- Other started -------------------------------
-
-
-
-
-
+#
 # ------------------------------- Other ends -------------------------------
+# 修复 qttools 编译错误
+sed -i '/qttools\/qdbus\/Makefile/d' feeds/packages/libs/qttools/Makefile
+sed -i '/qdbus \\/d' feeds/packages/libs/qttools/Makefile
 
-
-
+# 添加 Qt5 兼容配置
+echo "CONFIG_PACKAGE_qt5base=y" >> .config
+echo "CONFIG_PACKAGE_qt5tools=y" >> .config
