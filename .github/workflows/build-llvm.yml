@@ -1,0 +1,176 @@
+#=====================================================================================
+# Description: Build LLVM Toolchain for ARM64 on Ubuntu
+# Workflow to automate building LLVM from source with robust compilation strategy
+#=====================================================================================
+
+name: Build LLVM Toolchain
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      llvm_version:
+        description: "Select LLVM version to build"
+        required: true
+        default: "14.0.6"
+        type: choice
+        options:
+          - "14.0.6"
+          - "15.0.7"
+          - "16.0.6"
+      release_type:
+        description: "Release type"
+        required: true
+        default: "tarball"
+        type: choice
+        options:
+          - tarball
+          - docker
+
+env:
+  TZ: Asia/Shanghai
+  LLVM_SRC_DIR: llvm-project
+  BUILD_DIR: build
+  OUTPUT_DIR: output
+  LLVM_VERSION: ${{ github.event.inputs.llvm_version || '14.0.6' }}
+  DOCKER_IMAGE: llvm-toolchain:${{ github.event.inputs.llvm_version || '14.0.6' }}-arm64
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU for ARM64 emulation
+        if: runner.arch != 'ARM64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build python3-dev \
+            libffi-dev libncurses5-dev libz-dev \
+            libedit-dev libpcre3-dev libssl-dev \
+            curl wget tar xz-utils
+
+      - name: Download LLVM source
+        run: |
+          mkdir -p ${{ env.LLVM_SRC_DIR }}
+          wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${{ env.LLVM_VERSION }}/llvm-project-${{ env.LLVM_VERSION }}.src.tar.xz
+          tar -xJf llvm-project-${{ env.LLVM_VERSION }}.src.tar.xz -C ${{ env.LLVM_SRC_DIR }} --strip-components=1
+          rm llvm-project-${{ env.LLVM_VERSION }}.src.tar.xz
+
+      - name: Configure LLVM build
+        run: |
+          mkdir -p ${{ env.BUILD_DIR }}
+          cd ${{ env.BUILD_DIR }}
+          cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_PROJECTS="clang;lld;compiler-rt;libcxx;libcxxabi" \
+            -DLLVM_TARGETS_TO_BUILD="AArch64" \
+            -DLLVM_ENABLE_LTO=ON \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/${{ env.OUTPUT_DIR }}/llvm-${{ env.LLVM_VERSION }} \
+            -DLLVM_PARALLEL_COMPILE_JOBS=$(nproc) \
+            -DLLVM_PARALLEL_LINK_JOBS=$(nproc) \
+            ../${{ env.LLVM_SRC_DIR }}/llvm
+
+      - name: Build LLVM with robust compilation strategy
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          echo "开始编译LLVM，系统核心数: $(nproc)"
+          
+          # 使用鲁棒性编译策略
+          if command -v ninja &> /dev/null; then
+              # 使用Ninja构建系统
+              ninja -j$(($(nproc) + 1)) || ninja -j1 || ninja -j1 V=1
+          else
+              # 备用：使用Make构建系统
+              make -j$(($(nproc) + 1)) V=s || make -j1 || make -j1 V=s
+          fi
+
+      - name: Install LLVM
+        run: |
+          cd ${{ env.BUILD_DIR }}
+          ninja install
+
+      - name: Create tarball
+        if: ${{ github.event.inputs.release_type == 'tarball' || github.event.inputs.release_type == '' }}
+        run: |
+          cd ${{ env.OUTPUT_DIR }}
+          tar -cJf llvm-toolchain-arm64-${{ env.LLVM_VERSION }}.tar.xz llvm-${{ env.LLVM_VERSION }}
+
+      - name: Build Docker image
+        if: ${{ github.event.inputs.release_type == 'docker' }}
+        run: |
+          cd ${{ github.workspace }}
+          echo "FROM ubuntu:22.04" > Dockerfile
+          echo "COPY ${{ env.OUTPUT_DIR }}/llvm-${{ env.LLVM_VERSION }} /opt/llvm-${{ env.LLVM_VERSION }}" >> Dockerfile
+          echo "ENV PATH=/opt/llvm-${{ env.LLVM_VERSION }}/bin:$PATH" >> Dockerfile
+          echo "ENV LD_LIBRARY_PATH=/opt/llvm-${{ env.LLVM_VERSION }}/lib:$LD_LIBRARY_PATH" >> Dockerfile
+          echo "CMD [\"bash\"]" >> Dockerfile
+          
+          docker build -t ${{ env.DOCKER_IMAGE }} .
+
+      - name: Upload artifacts
+        if: ${{ github.event.inputs.release_type == 'tarball' || github.event.inputs.release_type == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-toolchain-arm64-${{ env.LLVM_VERSION }}
+          path: ${{ env.OUTPUT_DIR }}/llvm-toolchain-arm64-${{ env.LLVM_VERSION }}.tar.xz
+          retention-days: 7
+
+      - name: Login to Docker Hub
+        if: ${{ github.event.inputs.release_type == 'docker' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Push Docker image
+        if: ${{ github.event.inputs.release_type == 'docker' }}
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          context: ${{ github.workspace }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.DOCKER_IMAGE }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/llvm-toolchain:arm64-latest
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.release_type == 'tarball' || github.event.inputs.release_type == '' }}
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-arm64-${{ env.LLVM_VERSION }}
+          path: .
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: llvm-${{ env.LLVM_VERSION }}-arm64
+          release_name: LLVM Toolchain ${{ env.LLVM_VERSION }} for ARM64
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./llvm-toolchain-arm64-${{ env.LLVM_VERSION }}.tar.xz
+          asset_name: llvm-toolchain-arm64-${{ env.LLVM_VERSION }}.tar.xz
+          asset_content_type: application/x-xz    
