@@ -344,18 +344,23 @@ jobs:
           chmod +x ${DIY_P1_SH}
           cd openwrt/
           
-          # 使用 echo 而非 sed 添加源（更安全）
-          echo "src-git ${CUSTOM_FEEDS_NAME} ${CUSTOM_FEEDS_URL}" >> feeds.conf.default
-          echo "src-git ${CUSTOM_FEEDS_NAME2} ${CUSTOM_FEEDS_URL2}" >> feeds.conf.default
+          # 使用 printf 追加到文件（更安全）
+          printf "src-git %s %s\n" "${CUSTOM_FEEDS_NAME}" "${CUSTOM_FEEDS_URL}" >> feeds.conf.default
+          printf "src-git %s %s\n" "${CUSTOM_FEEDS_NAME2}" "${CUSTOM_FEEDS_URL2}" >> feeds.conf.default
           
-          # 确保源定义正确（移除格式不正确的行）
-          sed -i '/^src-git[[:space:]]\+[[:alnum:]_]\+[[:space:]]\+https\?:///!d' feeds.conf.default
+          # 确保文件格式正确（可选）
+          grep -q '^src-git[[:space:]]\+[[:alnum:]_]\+[[:space:]]\+https\?://' feeds.conf.default || {
+            echo "警告: feeds.conf.default 格式不正确，重置为默认"
+            echo "src-git packages https://github.com/openwrt/packages.git" > feeds.conf.default
+            echo "src-git luci https://github.com/openwrt/luci.git" >> feeds.conf.default
+            printf "src-git %s %s\n" "${CUSTOM_FEEDS_NAME}" "${CUSTOM_FEEDS_URL}" >> feeds.conf.default
+            printf "src-git %s %s\n" "${CUSTOM_FEEDS_NAME2}" "${CUSTOM_FEEDS_URL2}" >> feeds.conf.default
+          }
           
           ${GITHUB_WORKSPACE}/${DIY_P1_SH}
           
           # 过滤Qt6相关包
           sed -i '/qt6/d' feeds.conf.default
-
 
       - name: Update feeds
         run: |
