@@ -346,7 +346,9 @@ jobs:
          sed -i '$a src-git ${CUSTOM_FEEDS_NAME} ${CUSTOM_FEEDS_URL}' feeds.conf.default
          sed -i '2i src-git ${CUSTOM_FEEDS_NAME2} ${CUSTOM_FEEDS_URL2}' feeds.conf.default
          ${GITHUB_WORKSPACE}/${DIY_P1_SH}
-
+         
+         # 过滤Qt6相关包（避免与Qt5冲突）
+         sed -i '/qt6/d' feeds.conf.default  # 移除包含qt6的feeds条目
 
 
 
@@ -356,6 +358,9 @@ jobs:
         run: |
           cd openwrt/
           ./scripts/feeds update -a
+          
+          # 清理Qt6相关包（防止被安装）
+          rm -rf feeds/*/qt6*
           
           rm -rf 'feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}'
 
@@ -370,30 +375,38 @@ jobs:
           cd openwrt/
           ${GITHUB_WORKSPACE}/${DIY_P2_SH}
 
-# ============== 新增步骤 1: 修复 qttools 依赖 ==============
-      - name: Fix qttools dependencies
+      - name: Fix qttools dependencies (Qt5)
         run: |
           cd openwrt/
-          # 确保 Qt6 DBus 支持已启用
-          sed -i 's/CONFIG_PACKAGE_qt6base-dbus=n/CONFIG_PACKAGE_qt6base-dbus=y/' .config
-          # 禁用 qttools 的 qdbus 组件
-          echo "CONFIG_PACKAGE_qttools_qdbus=n" >> .config
-          # 添加 Qt5 兼容性支持
+          # 确保禁用Qt6相关包（避免版本冲突）
+          echo "CONFIG_PACKAGE_qt6base=n" >> .config
+          echo "CONFIG_PACKAGE_qt6base-dbus=n" >> .config
+          
+          # 强制启用Qt5基础库和DBus组件（qttools 5.15.8依赖）
           echo "CONFIG_PACKAGE_qt5base=y" >> .config
-          echo "CONFIG_PACKAGE_qt5tools=y" >> .config
+          echo "CONFIG_PACKAGE_qt5-dbus=y" >> .config  # Qt5的DBus库
+          echo "CONFIG_PACKAGE_qt5tools=y" >> .config  # Qt5工具链
+          
+          # 确保qttools依赖Qt5而非Qt6（修正Makefile依赖）
+          if [ -f "feeds/packages/libs/qttools/Makefile" ]; then
+            # 修改qttools的依赖为Qt5
+            sed -i 's/DEPENDS:=+qt6-base/DEPENDS:=+qt5-base +qt5-dbus/' feeds/packages/libs/qttools/Makefile
+          fi
 
-      # ============== 新增步骤 2: 确保编译顺序 ==============
-      - name: Ensure build order
+      - name: Ensure Qt5 DBus is compiled first
         run: |
           cd openwrt/
-          # 先编译 Qt6 基础库
-          make package/qt6base/{clean,compile} -j$(nproc) V=s || true
-          # 检查库文件是否存在
-          if [ ! -f staging_dir/target-*/usr/lib/libQt6DBus.a ]; then
-            echo "::warning::Qt6 DBus library missing, forcing rebuild"
-            make package/qt6base/clean
-            make package/qt6base/compile -j1 V=s
+          # 优先编译Qt5基础库和DBus组件
+          make package/qt5base/{clean,compile} -j$(nproc) V=s || make package/qt5base/compile -j1 V=s
+          make package/qt5-dbus/{clean,compile} -j$(nproc) V=s || make package/qt5-dbus/compile -j1 V=s
+          
+          # 检查Qt5 DBus库是否生成（关键验证）
+          QT5_DBUS_LIB="staging_dir/target-$(grep CONFIG_TARGET_ARCH .config | cut -d= -f2)/usr/lib/libQt5DBus.a"
+          if [ ! -f "${QT5_DBUS_LIB}" ]; then
+            echo "::error::Qt5 DBus library (libQt5DBus.a) not found! Compilation failed."
+            exit 1
           fi
+          echo "Qt5 DBus library verified: ${QT5_DBUS_LIB}"
 
       - name: Download package
         id: package
