@@ -334,21 +334,21 @@ jobs:
 
 
       - name: Load custom feeds
-       env:
-       CUSTOM_FEEDS_URL: "https://github.com/kenzok8/small-package"
-       CUSTOM_FEEDS_URL2: "https://github.com/kenzok8/small"
-       CUSTOM_FEEDS_NAME: "smpackage"
-       CUSTOM_FEEDS_NAME2: "small"
-       run: |
-         [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
-         chmod +x ${DIY_P1_SH}
-         cd openwrt/
-         sed -i '$a src-git ${CUSTOM_FEEDS_NAME} ${CUSTOM_FEEDS_URL}' feeds.conf.default
-         sed -i '2i src-git ${CUSTOM_FEEDS_NAME2} ${CUSTOM_FEEDS_URL2}' feeds.conf.default
-         ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+        env:
+        CUSTOM_FEEDS_URL: "https://github.com/kenzok8/small-package"
+        CUSTOM_FEEDS_URL2: "https://github.com/kenzok8/small"
+        CUSTOM_FEEDS_NAME: "smpackage"
+        CUSTOM_FEEDS_NAME2: "small"
+        run: |
+          [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
+          chmod +x ${DIY_P1_SH}
+          cd openwrt/
+          sed -i '$a src-git ${CUSTOM_FEEDS_NAME} ${CUSTOM_FEEDS_URL}' feeds.conf.default
+          ed -i '2i src-git ${CUSTOM_FEEDS_NAME2} ${CUSTOM_FEEDS_URL2}' feeds.conf.default
+          ${GITHUB_WORKSPACE}/${DIY_P1_SH}
          
-         # 过滤Qt6相关包（避免与Qt5冲突）
-         sed -i '/qt6/d' feeds.conf.default  # 移除包含qt6的feeds条目
+          # 过滤Qt6相关包（避免与Qt5冲突）
+          sed -i '/qt6/d' feeds.conf.default  # 移除包含qt6的feeds条目
 
 
 
