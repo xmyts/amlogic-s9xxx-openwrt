@@ -40,9 +40,6 @@ git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 sed -i '/qttools\/qdbus\/Makefile/d' feeds/packages/libs/qttools/Makefile
 sed -i '/qdbus \\/d' feeds/packages/libs/qttools/Makefile
 
-# 添加 Qt5 兼容配置
-echo "CONFIG_PACKAGE_qt5base=y" >> .config
-echo "CONFIG_PACKAGE_qt5tools=y" >> .config
 
 # 确保工具链目录存在
 if [ ! -d staging_dir/toolchain-* ]; then
