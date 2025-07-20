@@ -36,18 +36,34 @@ git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 # git apply ../config/patches/{0001*,0002*}.patch --directory=feeds/luci
 #
 # ------------------------------- Other ends -------------------------------
-# 修复 qttools 编译错误
-sed -i '/qttools\/qdbus\/Makefile/d' feeds/packages/libs/qttools/Makefile
-sed -i '/qdbus \\/d' feeds/packages/libs/qttools/Makefile
 
+# ============== 新增: 修复 Qt5 编译依赖 ==============
+# 确保使用 Qt5 而非 Qt6
+echo "CONFIG_PACKAGE_qt6base=n" >> .config
+echo "CONFIG_PACKAGE_qt6base-dbus=n" >> .config
+echo "CONFIG_PACKAGE_qt5base=y" >> .config
+echo "CONFIG_PACKAGE_qt5-dbus=y" >> .config  # 确保 Qt5 DBus 组件启用
+echo "CONFIG_PACKAGE_qt5tools=y" >> .config  # 确保 Qt5 工具链启用
+
+# 修正 qttools 的依赖配置（强制依赖 Qt5）
+if [ -f "feeds/packages/libs/qttools/Makefile" ]; then
+    sed -i 's/DEPENDS:=+qt6-base/DEPENDS:=+qt5-base +qt5-dbus/g' feeds/packages/libs/qttools/Makefile
+fi
 
 # 确保工具链目录存在
 if [ ! -d staging_dir/toolchain-* ]; then
     make toolchain/install -j$(nproc) V=s
 fi
 
-# 修复 musl 库路径
+# 修复 musl 库路径（保留原有逻辑）
 TOOLCHAIN_DIR=$(ls -d staging_dir/toolchain-* | head -1)
 if [ -n "$TOOLCHAIN_DIR" ] && [ ! -f $TOOLCHAIN_DIR/lib/ld-musl-*.so* ]; then
     cp -f $TOOLCHAIN_DIR/usr/lib/ld-musl-*.so* $TOOLCHAIN_DIR/lib/
+fi
+
+# 验证 Qt5 DBus 库是否存在（关键检查）
+echo "Checking for Qt5 DBus library..."
+QT5_DBUS_LIB="staging_dir/target-$(grep CONFIG_TARGET_ARCH .config | cut -d= -f2)/usr/lib/libQt5DBus.a"
+if [ ! -f "${QT5_DBUS_LIB}" ]; then
+    echo "::warning::Qt5 DBus library not found. Will be built during compilation."
 fi
