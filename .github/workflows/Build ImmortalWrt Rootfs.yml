@@ -1,0 +1,150 @@
+name: Build ImmortalWrt Rootfs
+
+on:
+  workflow_dispatch:
+    inputs:
+      openwrt_kernel:
+        description: "Select kernel version"
+        required: false
+        default: "5.15.y"
+        type: choice
+        options:
+          - 5.4.y
+          - 5.10.y
+          - 5.15.y
+          - 6.1.y
+          - 6.6.y
+          - 6.12.y
+
+env:
+  CONFIG_FILE: config-immortalwrt
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: America/New_York
+
+jobs:
+  build-rootfs:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.repository.owner.id }} == ${{ github.event.sender.id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialization environment
+        id: init
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          docker rmi $(docker images -q) 2>/dev/null
+          [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
+          sudo swapoff -a
+          sudo rm -f /swapfile /mnt/swapfile
+          sudo -E apt-get -y update
+          sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
+          sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt)
+          sudo -E systemctl daemon-reload
+          sudo -E apt-get -y autoremove --purge
+          sudo -E apt-get clean
+          sudo timedatectl set-timezone "${TZ}"
+          echo "status=success" >> ${GITHUB_OUTPUT}
+
+      - name: Clone ImmortalWrt source code
+        id: codes
+        if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
+        run: |
+          # Set up compilation source code
+          REPO_URL="https://github.com/immortalwrt/immortalwrt"
+          REPO_BRANCH="master"
+          TAGS_NAME="immortalwrt"
+
+          # Clone source code
+          git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
+          
+          # Add third-party packages
+          cd openwrt
+          sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default
+
+          # Set output information
+          echo "build_tag=ImmortalWrt_Rootfs_${{ inputs.openwrt_kernel }}_$(date +"%Y%m%d")" >> ${GITHUB_OUTPUT}
+          echo "REPO_URL=${REPO_URL}" >> ${GITHUB_OUTPUT}
+          echo "TAGS_NAME=${TAGS_NAME}" >> ${GITHUB_OUTPUT}
+          echo "status=success" >> ${GITHUB_OUTPUT}
+
+      - name: Update and install feeds
+        run: |
+          cd openwrt/
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Load custom configuration
+        run: |
+          [[ -d "files" ]] && mv -f files openwrt/files
+          [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
+          # 执行自定义脚本（如果存在）
+          if [[ -f "${DIY_P1_SH}" ]]; then
+            chmod +x ${DIY_P1_SH}
+            cd openwrt/
+            ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+          fi
+          if [[ -f "${DIY_P2_SH}" ]]; then
+            chmod +x ${DIY_P2_SH}
+            cd openwrt/
+            ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+          fi
+
+      - name: Download packages
+        run: |
+          cd openwrt/
+          make defconfig
+          make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: Compile rootfs
+        id: compile
+        run: |
+          cd openwrt/
+          echo -e "$(nproc) thread compile"
+          make -j$(($(nproc) + 1)) V=s || make -j1 || make -j1 V=s
+          echo "status=success" >> ${GITHUB_OUTPUT}
+
+      - name: Prepare rootfs artifact
+        id: prepare
+        if: ${{ steps.compile.outputs.status }} == 'success' && !cancelled()
+        run: |
+          cd openwrt/bin/targets/*/*/
+          ROOTFS_FILE=$(find . -name "*rootfs.tar.gz" | head -n 1)
+          if [[ -z "${ROOTFS_FILE}" ]]; then
+            echo "Rootfs file not found!"
+            exit 1
+          fi
+          mkdir -p ../../../output
+          cp ${ROOTFS_FILE} ../../../output/
+          cp ../../../../.config ../../../output/config.txt
+          cd ../../../output
+          sha256sum $(basename ${ROOTFS_FILE}) > $(basename ${ROOTFS_FILE}).sha256
+          echo "rootfs_path=openwrt/output/$(basename ${ROOTFS_FILE})" >> ${GITHUB_OUTPUT}
+          echo "status=success" >> ${GITHUB_OUTPUT}
+
+      - name: Upload rootfs to Release
+        uses: ncipollo/release-action@main
+        if: ${{ steps.prepare.outputs.status }} == 'success' && !cancelled()
+        with:
+          tag: ${{ steps.codes.outputs.build_tag }}
+          artifacts: |
+            ${{ steps.prepare.outputs.rootfs_path }}
+            openwrt/output/$(basename ${{ steps.prepare.outputs.rootfs_path }}).sha256
+            openwrt/output/config.txt
+          allowUpdates: true
+          removeArtifacts: false
+          replacesArtifacts: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            ### ImmortalWrt Rootfs Information
+            - Kernel Version: ${{ inputs.openwrt_kernel }}
+            - Source Code: [ImmortalWrt](${{ steps.codes.outputs.REPO_URL }})
+            - Default Configuration: Based on config-immortalwrt
+            - Included Packages: Default + NueXini_Packages
+            - SHA256 Checksum: See attached .sha256 file
