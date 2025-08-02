@@ -26,15 +26,10 @@ on:
           - 6.12.y
 
 env:
+  # 配置文件路径
   CONFIG_FILE: config/${{ inputs.source_branch }}/config-immortalwrt
   TZ: America/New_York
-  THIRD_PARTY_FEED: "src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git"
-  # 第三方插件仓库地址
-  THIRD_PARTY_REPO: "https://github.com/NueXini/NueXini_Packages.git"
-  # 需要复制的插件目录
-  PLUGIN_DIRS: "luci-app-adguardhome luci-app-oaf adguardhome"
-  # 目标目录
-  TARGET_DIR: "package/custom-plugins"
+  # 移除第三方源配置，改为单独处理
 
 jobs:
   build-rootfs:
@@ -85,56 +80,58 @@ jobs:
 
           # 克隆源码
           git clone --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt
-          cd openwrt
-          # 添加第三方插件源
-          echo "${{ env.THIRD_PARTY_FEED }}" >> feeds.conf.default
-
+          
           # 输出标签信息
           echo "build_tag=ImmortalWrt_Rootfs_${{ inputs.openwrt_kernel }}_$(date +"%Y%m%d")" >> ${GITHUB_OUTPUT}
           echo "REPO_URL=${REPO_URL}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Download third-party plugins source
-        if: ${{ steps.codes.outputs.status }} == 'success' && !cancelled()
+      - name: 单独下载第三方插件源码
         run: |
-          # 克隆第三方插件仓库
-          git clone --depth 1 ${{ env.THIRD_PARTY_REPO }} nuexini-packages
-          
-          # 显示克隆的插件目录结构（用于调试）
-          echo "Third-party plugins directory structure:"
-          tree nuexini-packages -L 2
+          # 克隆NueXini_Packages仓库
+          git clone --depth 1 https://github.com/NueXini/NueXini_Packages.git third_party_plugins
+          # 查看下载的插件目录
+          ls -la third_party_plugins
 
-      - name: Copy plugins to custom directory
-        if: ${{ steps.codes.outputs.status }} == 'success' && !cancelled()
+      - name: 创建自定义插件目录并复制所需插件
         run: |
-          # 进入immortalwrt源码目录
-          cd openwrt
+          # 在immortalwrt源码中创建custom-plugins目录
+          mkdir -p openwrt/package/custom-plugins
           
-          # 创建自定义插件目录
-          mkdir -p ${{ env.TARGET_DIR }}
-          echo "Created target directory: $(pwd)/${{ env.TARGET_DIR }}"
+          # 复制指定插件到custom-plugins目录
+          # 复制luci-app-adguardhome
+          if [ -d "third_party_plugins/luci-app-adguardhome" ]; then
+            cp -rf third_party_plugins/luci-app-adguardhome openwrt/package/custom-plugins/
+            echo "已复制luci-app-adguardhome"
+          else
+            echo "警告：未找到luci-app-adguardhome目录"
+          fi
           
-          # 复制指定插件目录
-          for dir in ${{ env.PLUGIN_DIRS }}; do
-            if [ -d "../nuexini-packages/$dir" ]; then
-              cp -rf ../nuexini-packages/$dir ${{ env.TARGET_DIR }}/
-              echo "Copied plugin: $dir to ${{ env.TARGET_DIR }}"
-            else
-              echo "Warning: Plugin directory $dir not found in third-party source"
-            fi
-          done
+          # 复制luci-app-oaf
+          if [ -d "third_party_plugins/luci-app-oaf" ]; then
+            cp -rf third_party_plugins/luci-app-oaf openwrt/package/custom-plugins/
+            echo "已复制luci-app-oaf"
+          else
+            echo "警告：未找到luci-app-oaf目录"
+          fi
           
-          # 显示复制后的目录结构（用于验证）
-          echo "Custom plugins directory structure after copy:"
-          tree ${{ env.TARGET_DIR }}
+          # 复制adguardhome
+          if [ -d "third_party_plugins/adguardhome" ]; then
+            cp -rf third_party_plugins/adguardhome openwrt/package/custom-plugins/
+            echo "已复制adguardhome"
+          else
+            echo "警告：未找到adguardhome目录"
+          fi
+          
+          # 查看复制结果
+          ls -la openwrt/package/custom-plugins
 
       - name: Update and install feeds
         run: |
           cd openwrt/
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          # 安装第三方插件依赖
-          ./scripts/feeds install -p NueXini_Packages adbyby atinout cellled clouddrive2 HomeRedirect modeminfo pingcontrol pppwn-cpp telegrambot tun2socks xmm-modem
+          # 不需要再从第三方源安装插件，因为已手动复制
 
       - name: Load custom configuration (config-immortalwrt)
         run: |
@@ -204,8 +201,6 @@ jobs:
           cp ${ROOTFS_PATH} output/
           # 复制实际使用的配置文件
           cp ${{ env.CONFIG_FILE }} output/config-immortalwrt-used
-          # 复制插件目录结构作为参考
-          cp -r ${{ env.TARGET_DIR }} output/custom-plugins-snapshot 2>/dev/null || true
           cd output
           ROOTFS_FILE=$(basename ${ROOTFS_PATH})
           sha256sum ${ROOTFS_FILE} > ${ROOTFS_FILE}.sha256
@@ -222,12 +217,10 @@ jobs:
             ${{ steps.find_rootfs.outputs.rootfs_path }}
             output/${{ steps.find_rootfs.outputs.rootfs_path }}.sha256
             output/config-immortalwrt-used
-            output/custom-plugins-snapshot
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ### 根文件系统信息
             - 配置文件路径: ${{ env.CONFIG_FILE }}
             - 内核版本: ${{ inputs.openwrt_kernel }}
-            - 包含插件: 官方插件 + NueXini_Packages 精选插件
-            - 自定义插件: ${{ env.PLUGIN_DIRS }}
+            - 包含插件: 官方插件 + 自定义插件(luci-app-adguardhome, luci-app-oaf, adguardhome)
     
