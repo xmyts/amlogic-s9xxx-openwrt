@@ -18,8 +18,6 @@ on:
 
 env:
   CONFIG_FILE: config-immortalwrt
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-part2.sh
   TZ: America/New_York
 
 jobs:
@@ -77,27 +75,20 @@ jobs:
           cd openwrt/
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          # 安装缺失的依赖包
+          ./scripts/feeds install -p NueXini_Packages adbyby atinout cellled clouddrive2 HomeRedirect modeminfo pingcontrol pppwn-cpp telegrambot tun2socks xmm-modem
 
       - name: Load custom configuration
         run: |
           [[ -d "files" ]] && mv -f files openwrt/files
           [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
-          # 执行自定义脚本（如果存在）
-          if [[ -f "${DIY_P1_SH}" ]]; then
-            chmod +x ${DIY_P1_SH}
-            cd openwrt/
-            ${GITHUB_WORKSPACE}/${DIY_P1_SH}
-          fi
-          if [[ -f "${DIY_P2_SH}" ]]; then
-            chmod +x ${DIY_P2_SH}
-            cd openwrt/
-            ${GITHUB_WORKSPACE}/${DIY_P2_SH}
-          fi
+          # 检查并更新配置，自动安装缺失的依赖
+          cd openwrt/
+          make defconfig
 
       - name: Download packages
         run: |
           cd openwrt/
-          make defconfig
           make download -j8
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
@@ -107,36 +98,47 @@ jobs:
         run: |
           cd openwrt/
           echo -e "$(nproc) thread compile"
-          make -j$(($(nproc) + 1)) V=s || make -j1 || make -j1 V=s
+          # 先尝试正常编译，如果失败则单线程编译并显示详细输出
+          make -j$(($(nproc) + 1)) || make -j1 V=s
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Prepare rootfs artifact
-        id: prepare
+      - name: Find rootfs file
+        id: find_rootfs
         if: ${{ steps.compile.outputs.status }} == 'success' && !cancelled()
         run: |
-          cd openwrt/bin/targets/*/*/
-          ROOTFS_FILE=$(find . -name "*rootfs.tar.gz" | head -n 1)
-          if [[ -z "${ROOTFS_FILE}" ]]; then
-            echo "Rootfs file not found!"
+          cd openwrt/bin/targets
+          # 查找所有可能的rootfs文件
+          ROOTFS_PATH=$(find . -name "*rootfs.tar.gz" | head -n 1)
+          if [[ -z "${ROOTFS_PATH}" ]]; then
+            echo "找不到rootfs文件，尝试查找其他格式..."
+            # 查找其他可能的rootfs格式
+            ROOTFS_PATH=$(find . -name "*rootfs*.tar*" | head -n 1)
+          fi
+          
+          if [[ -z "${ROOTFS_PATH}" ]]; then
+            echo "错误：未找到根文件系统文件"
             exit 1
           fi
+          
+          echo "找到根文件系统: ${ROOTFS_PATH}"
           mkdir -p ../../../output
-          cp ${ROOTFS_FILE} ../../../output/
-          cp ../../../../.config ../../../output/config.txt
+          cp ${ROOTFS_PATH} ../../../output/
+          cp ../../.config ../../../output/config.txt
           cd ../../../output
-          sha256sum $(basename ${ROOTFS_FILE}) > $(basename ${ROOTFS_FILE}).sha256
-          echo "rootfs_path=openwrt/output/$(basename ${ROOTFS_FILE})" >> ${GITHUB_OUTPUT}
+          ROOTFS_FILE=$(basename ${ROOTFS_PATH})
+          sha256sum ${ROOTFS_FILE} > ${ROOTFS_FILE}.sha256
+          echo "rootfs_path=output/${ROOTFS_FILE}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Upload rootfs to Release
         uses: ncipollo/release-action@main
-        if: ${{ steps.prepare.outputs.status }} == 'success' && !cancelled()
+        if: ${{ steps.find_rootfs.outputs.status }} == 'success' && !cancelled()
         with:
           tag: ${{ steps.codes.outputs.build_tag }}
           artifacts: |
-            ${{ steps.prepare.outputs.rootfs_path }}
-            openwrt/output/$(basename ${{ steps.prepare.outputs.rootfs_path }}).sha256
-            openwrt/output/config.txt
+            ${{ steps.find_rootfs.outputs.rootfs_path }}
+            output/$(basename ${{ steps.find_rootfs.outputs.rootfs_path }}).sha256
+            output/config.txt
           allowUpdates: true
           removeArtifacts: false
           replacesArtifacts: true
