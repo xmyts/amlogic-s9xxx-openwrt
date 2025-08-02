@@ -1,4 +1,4 @@
-name: Build ImmortalWrt Rootfs
+name: Build ImmortalWrt Rootfs with Plugins
 
 on:
   workflow_dispatch:
@@ -17,8 +17,10 @@ on:
           - 6.12.y
 
 env:
-  CONFIG_FILE: config-immortalwrt
+  CONFIG_FILE: config-immortalwrt  # 明确使用config-immortalwrt配置文件
   TZ: America/New_York
+  # 第三方插件源（保留）
+  THIRD_PARTY_FEED: "src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git"
 
 jobs:
   build-rootfs:
@@ -29,19 +31,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Initialization environment
+      - name: Initialization environment (full dependencies)
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          # 清理冗余文件释放空间
           docker rmi $(docker images -q) 2>/dev/null
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
           sudo swapoff -a
           sudo rm -f /swapfile /mnt/swapfile
+
+          # 安装原始工作流中验证过的完整依赖（确保编译工具链完整）
           sudo -E apt-get -y update
           sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
+          # 使用原始工作流中经过验证的依赖列表
           sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt)
+          # 补充可能遗漏的依赖
+          sudo -E apt-get -y install build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget
+
           sudo -E systemctl daemon-reload
           sudo -E apt-get -y autoremove --purge
           sudo -E apt-get clean
@@ -52,101 +61,121 @@ jobs:
         id: codes
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
-          # Set up compilation source code
           REPO_URL="https://github.com/immortalwrt/immortalwrt"
           REPO_BRANCH="master"
           TAGS_NAME="immortalwrt"
 
-          # Clone source code
-          git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
-          
-          # Add third-party packages
+          # 克隆源码（保留完整历史，避免浅克隆导致依赖问题）
+          git clone --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt
           cd openwrt
-          sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default
+          # 添加第三方插件源（保留）
+          echo "${{ env.THIRD_PARTY_FEED }}" >> feeds.conf.default
 
-          # Set output information
+          # 输出标签信息
           echo "build_tag=ImmortalWrt_Rootfs_${{ inputs.openwrt_kernel }}_$(date +"%Y%m%d")" >> ${GITHUB_OUTPUT}
           echo "REPO_URL=${REPO_URL}" >> ${GITHUB_OUTPUT}
-          echo "TAGS_NAME=${TAGS_NAME}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Update and install feeds
+      - name: Update and install feeds (with dependencies)
         run: |
           cd openwrt/
+          # 更新feeds（包含第三方插件）
           ./scripts/feeds update -a
+          # 安装所有包（包括第三方插件的依赖）
           ./scripts/feeds install -a
-          # 安装缺失的依赖包
+          # 强制安装第三方插件可能缺失的依赖（针对性处理）
           ./scripts/feeds install -p NueXini_Packages adbyby atinout cellled clouddrive2 HomeRedirect modeminfo pingcontrol pppwn-cpp telegrambot tun2socks xmm-modem
 
-      - name: Load custom configuration
+      - name: Load custom configuration (config-immortalwrt)
         run: |
-          [[ -d "files" ]] && mv -f files openwrt/files
-          [[ -e "${CONFIG_FILE}" ]] && cp -f ${CONFIG_FILE} openwrt/.config
-          # 检查并更新配置，自动安装缺失的依赖
+          # 复制自定义配置文件到OpenWrt目录
+          if [[ -f "${{ env.CONFIG_FILE }}" ]]; then
+            cp -f ${{ env.CONFIG_FILE }} openwrt/.config
+            echo "已加载配置文件: ${{ env.CONFIG_FILE }}"
+          else
+            echo "错误：未找到配置文件 ${{ env.CONFIG_FILE }}"
+            exit 1
+          fi
+          # 生成最终配置（自动处理依赖冲突）
           cd openwrt/
           make defconfig
+          # 确认配置中启用了rootfs生成（关键检查）
+          if ! grep -q "CONFIG_TARGET_ROOTFS_TARGZ=y" .config; then
+            echo "错误：配置文件中未启用rootfs.tar.gz生成，请在config-immortalwrt中勾选Target Images -> tar.gz"
+            exit 1
+          fi
 
-      - name: Download packages
+      - name: Download packages (完整下载)
         run: |
           cd openwrt/
-          make download -j8
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
+          # 下载所有依赖包（多线程加速）
+          make download -j$(nproc)
+          # 清理无效文件
+          find dl -size -1024c -delete
 
-      - name: Compile rootfs
+      - name: Compile rootfs (带详细日志)
         id: compile
         run: |
           cd openwrt/
-          echo -e "$(nproc) thread compile"
-          # 先尝试正常编译，如果失败则单线程编译并显示详细输出
-          make -j$(($(nproc) + 1)) || make -j1 V=s
-          echo "status=success" >> ${GITHUB_OUTPUT}
-
-      - name: Find rootfs file
-        id: find_rootfs
-        if: ${{ steps.compile.outputs.status }} == 'success' && !cancelled()
-        run: |
-          cd openwrt/bin/targets
-          # 查找所有可能的rootfs文件
-          ROOTFS_PATH=$(find . -name "*rootfs.tar.gz" | head -n 1)
-          if [[ -z "${ROOTFS_PATH}" ]]; then
-            echo "找不到rootfs文件，尝试查找其他格式..."
-            # 查找其他可能的rootfs格式
-            ROOTFS_PATH=$(find . -name "*rootfs*.tar*" | head -n 1)
-          fi
-          
-          if [[ -z "${ROOTFS_PATH}" ]]; then
-            echo "错误：未找到根文件系统文件"
+          # 编译（保留详细日志，便于排查错误）
+          make -j$(nproc) V=s 2>&1 | tee compile.log
+          # 检查编译是否成功（通过是否生成bin目录判断）
+          if [[ -d "bin/targets" ]]; then
+            echo "status=success" >> ${GITHUB_OUTPUT}
+          else
+            echo "编译失败，未生成bin目录"
             exit 1
           fi
-          
-          echo "找到根文件系统: ${ROOTFS_PATH}"
-          mkdir -p ../../../output
-          cp ${ROOTFS_PATH} ../../../output/
-          cp ../../.config ../../../output/config.txt
-          cd ../../../output
+
+      - name: Locate rootfs and prepare artifacts
+        id: find_rootfs
+        if: ${{ steps.compile.outputs.status }} == 'success'
+        run: |
+          cd openwrt/
+          # 查找rootfs（借鉴原始工作流的路径模式，区分大小写但OpenWrt默认小写）
+          # 路径格式：bin/targets/<平台>/<子平台>/*rootfs.tar.gz
+          ROOTFS_PATH=$(find bin/targets -name "*rootfs.tar.gz" | head -n 1)
+          if [[ -z "${ROOTFS_PATH}" ]]; then
+            echo "错误：未找到rootfs.tar.gz，尝试其他格式..."
+            # 检查是否有大写开头的Rootfs（Linux区分大小写，可能性低但保险）
+            ROOTFS_PATH=$(find bin/targets -name "*Rootfs.tar.gz" | head -n 1)
+          fi
+          # 最终检查
+          if [[ -z "${ROOTFS_PATH}" ]]; then
+            echo "错误：未找到任何rootfs文件，编译日志如下："
+            cat compile.log
+            exit 1
+          fi
+
+          # 准备输出目录
+          mkdir -p output
+          # 复制rootfs
+          cp ${ROOTFS_PATH} output/
+          # 复制编译用的配置文件（满足上传需求）
+          cp .config output/config-immortalwrt-used
+          # 生成校验值
+          cd output
           ROOTFS_FILE=$(basename ${ROOTFS_PATH})
           sha256sum ${ROOTFS_FILE} > ${ROOTFS_FILE}.sha256
+
+          # 输出路径
           echo "rootfs_path=output/${ROOTFS_FILE}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
-      - name: Upload rootfs to Release
+      - name: Upload artifacts (rootfs + 配置文件)
         uses: ncipollo/release-action@main
-        if: ${{ steps.find_rootfs.outputs.status }} == 'success' && !cancelled()
+        if: ${{ steps.find_rootfs.outputs.status }} == 'success'
         with:
           tag: ${{ steps.codes.outputs.build_tag }}
           artifacts: |
             ${{ steps.find_rootfs.outputs.rootfs_path }}
-            output/$(basename ${{ steps.find_rootfs.outputs.rootfs_path }}).sha256
-            output/config.txt
-          allowUpdates: true
-          removeArtifacts: false
-          replacesArtifacts: true
+            output/${{ steps.find_rootfs.outputs.rootfs_path }}.sha256
+            output/config-immortalwrt-used  # 上传实际使用的配置文件
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            ### ImmortalWrt Rootfs Information
-            - Kernel Version: ${{ inputs.openwrt_kernel }}
-            - Source Code: [ImmortalWrt](${{ steps.codes.outputs.REPO_URL }})
-            - Default Configuration: Based on config-immortalwrt
-            - Included Packages: Default + NueXini_Packages
-            - SHA256 Checksum: See attached .sha256 file
+            ### 根文件系统信息
+            - 内核版本: ${{ inputs.openwrt_kernel }}
+            - 配置文件: 使用 config-immortalwrt
+            - 包含插件: 官方插件 + NueXini_Packages
+            - 校验值: 见附件 .sha256 文件
+            - 生成配置: 附带上传实际编译用的 config-immortalwrt-used
