@@ -12,7 +12,7 @@ on:
       source_branch:
         description: "Select the source branch"
         required: false
-        default: "main"
+        default: "v23.05.5"
         type: choice
         options:
           - openwrt-main
@@ -262,12 +262,10 @@ jobs:
           sudo swapoff -a
           sudo rm -f /swapfile /mnt/swapfile
           sudo -E apt-get -y update
-          
-          # 清理旧软件包并安装依赖
           sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
-          sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt) build-essential gcc-multilib g++-multilib texinfo flex bison libncurses5-dev wget unzip
-          
+          sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2204-make-openwrt)
           sudo -E systemctl daemon-reload
+          #sudo -E apt-get -y full-upgrade
           sudo -E apt-get -y autoremove --purge
           sudo -E apt-get clean
           sudo sed -i '/NVM_DIR/d;/skel/d' /root/{.bashrc,.profile}
@@ -298,10 +296,10 @@ jobs:
         working-directory: /builder
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
-          # 选择源码仓库
+          # Set up compilation source code
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
               REPO_URL="https://github.com/openwrt/openwrt"
-              REPO_BRANCH="main"
+              REPO_BRANCH="23.05"
               TAGS_NAME="official"
           elif [[ "${{ inputs.source_branch }}" == *"lede"* ]]; then
               REPO_URL="https://github.com/coolsnowwolf/lede"
@@ -316,12 +314,12 @@ jobs:
               exit 1
           fi
 
-          # 克隆源码并创建链接
+          # Clone source code
           git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
           ln -sf /builder/openwrt ${GITHUB_WORKSPACE}/openwrt
           ln -sf /builder/openwrt /home/runner/work/_actions/ophub/amlogic-s9xxx-openwrt/main/openwrt
 
-          # 设置输出信息
+          # Set output information
           echo "build_tag=OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
           echo -e "REPO_URL: [ ${REPO_URL} ]\nREPO_BRANCH: [ ${REPO_BRANCH} ]\nTAGS_NAME: [ ${TAGS_NAME} ]"
           df -hT ${PWD}
@@ -330,42 +328,17 @@ jobs:
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Load custom feeds
-        env:
-          CUSTOM_FEEDS_URL: "https://github.com/kenzok8/small-package"
-          CUSTOM_FEEDS_URL2: "https://github.com/kenzok8/small"
-          CUSTOM_FEEDS_NAME: "smpackage"
-          CUSTOM_FEEDS_NAME2: "small"
         run: |
           [[ -f "${FEEDS_CONF}" ]] && cp -f ${FEEDS_CONF} openwrt/feeds.conf.default
           chmod +x ${DIY_P1_SH}
           cd openwrt/
-          
-          # 添加官方Qt6源
-          echo "src-git qt6 https://github.com/openwrt/packages.git;master/libs/qt6" >> feeds.conf.default
-          
-          # 添加第三方源
-          printf "src-git %s %s\n" "${CUSTOM_FEEDS_NAME}" "${CUSTOM_FEEDS_URL}" >> feeds.conf.default
-          printf "src-git %s %s\n" "${CUSTOM_FEEDS_NAME2}" "${CUSTOM_FEEDS_URL2}" >> feeds.conf.default
-          
-          # 过滤Qt5相关源
-          sed -i '/qt5/d' feeds.conf.default
-          
           ${GITHUB_WORKSPACE}/${DIY_P1_SH}
 
       - name: Update feeds
-        run: |
-          cd openwrt/
-          ./scripts/feeds update -a
-          
-          # 清理冲突包（保留Qt6相关）
-          rm -rf 'feeds/smpackage/{base-files,dnsmasq,firewall*,fullconenat,libnftnl,nftables,ppp,opkg,ucl,upx,vsftpd*,miniupnpd-iptables,wireless-regdb}'
+        run: cd openwrt/ && ./scripts/feeds update -a
 
       - name: Install feeds
-        run: |
-          cd openwrt/
-          ./scripts/feeds install -a
-          # 强制安装Qt6核心组件
-          ./scripts/feeds install qt6base qt6base-dbus qt6tools qt6svg qt6network qttools
+        run: cd openwrt/ && ./scripts/feeds install -a
 
       - name: Load custom configuration
         run: |
@@ -374,37 +347,6 @@ jobs:
           chmod +x ${DIY_P2_SH}
           cd openwrt/
           ${GITHUB_WORKSPACE}/${DIY_P2_SH}
-          
-          # 禁用Qt5，启用Qt6
-          echo "CONFIG_PACKAGE_qt5base=n" >> .config
-          echo "CONFIG_PACKAGE_qt5-dbus=n" >> .config
-          echo "CONFIG_PACKAGE_qt5tools=n" >> .config
-          echo "CONFIG_PACKAGE_qt6base=y" >> .config
-          echo "CONFIG_PACKAGE_qt6base-dbus=y" >> .config
-          echo "CONFIG_PACKAGE_qt6tools=y" >> .config
-          echo "CONFIG_PACKAGE_qttools=y" >> .config
-
-      - name: Compile Qt6 first
-        run: |
-          cd openwrt/
-          # 验证Qt6包是否存在
-          if [ ! -d "feeds/packages/libs/qt6base" ]; then
-            echo "::error::Qt6 base package not found! Check feeds configuration."
-            exit 1
-          fi
-          
-          # 优先编译Qt6组件（单线程避免冲突）
-          make package/qt6base/{clean,compile} -j1 V=s || { echo "::error::Failed to compile qt6base"; exit 1; }
-          make package/qt6base-dbus/{clean,compile} -j1 V=s || { echo "::error::Failed to compile qt6base-dbus"; exit 1; }
-          make package/qt6tools/{clean,compile} -j1 V=s || { echo "::error::Failed to compile qt6tools"; exit 1; }
-          
-          # 验证Qt6库是否生成
-          QT6_LIB="staging_dir/target-$(grep CONFIG_TARGET_ARCH .config | cut -d= -f2)/usr/lib/libQt6Core.so"
-          if [ ! -f "${QT6_LIB}" ]; then
-            echo "::error::Qt6 core library (libQt6Core.so) not found!"
-            exit 1
-          fi
-          echo "Qt6 core library verified: ${QT6_LIB}"
 
       - name: Download package
         id: package
@@ -427,18 +369,18 @@ jobs:
         id: clean
         if: ${{ steps.compile.outputs.status }} == 'success' && !cancelled()
         run: |
-          # 清理空间并打包输出
+          # Clean up server space
           cd openwrt/
           [[ -d "output" ]] || mkdir output
           cp -f bin/targets/*/*/*rootfs.tar.gz output/
           cp -f .config output/config
           rm -rf $(ls . | grep -v "^output$" | xargs) 2>/dev/null
 
-          # 生成校验文件
+          # Generate sha256sum file
           cd output/
           for file in *; do [[ ! -d "${file}" ]] && sha256sum "${file}" >"${file}.sha"; done
 
-          # 设置输出信息
+          # Set output information
           df -hT ${PWD}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
