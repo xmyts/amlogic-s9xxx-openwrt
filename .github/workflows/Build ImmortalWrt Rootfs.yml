@@ -54,7 +54,7 @@ jobs:
           restore-keys: |
             ${{ inputs.source_branch }}-${{ inputs.openwrt_kernel }}-
 
-      - name: Initialize environment (fix EOF syntax)
+      - name: Initialize environment
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -65,9 +65,8 @@ jobs:
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
 
-          # 修复核心问题：使用无缩进的EOF格式（严格顶格）
+          # 配置官方源
           echo "替换为官方源，仅启用必要仓库..."
-          # 注意：下面的EOF必须严格顶格，前后无任何字符
           sudo tee /etc/apt/sources.list <<EOF
 deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
 deb-src http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
@@ -79,10 +78,9 @@ deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe
 deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe
 EOF
 
-          # 强制更新源并修复依赖
+          # 强制更新源
           sudo -E apt-get -y update --fix-missing || {
             echo "源更新失败，尝试更换备用源..."
-            # 备用源同样使用严格顶格的EOF
             sudo tee /etc/apt/sources.list <<EOF
 deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
 deb-src http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
@@ -134,7 +132,7 @@ EOF
 
       - name: Clone source code
         id: codes
-        if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
+        if: ${{ stepsinit.outputs.status }} == 'success' && !cancelled()
         run: |
           case "${{ inputs.source_branch }}" in
             "immortalwrt-master")
@@ -160,7 +158,7 @@ EOF
 
           # 克隆源码带重试
           for i in {1..3}; do
-            git clone --depth 1 --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt && break
+            git clone --depth 1 --single-branch --branch="${REPO_BRANCH}" "${REPO_URL}" openwrt && break
             echo "源码克隆第$i次失败，重试..."
             rm -rf openwrt
             sleep 5
@@ -174,19 +172,26 @@ EOF
         run: |
           cd openwrt
 
-          # 修复依赖仓库URL
-          [[ -f "feeds/packages/utils/csstidy/Makefile" ]] && \
+          # 修复csstidy仓库URL
+          if [[ -f "feeds/packages/utils/csstidy/Makefile" ]]; then
             sed -i "s|https://github.com/jow-/csstidy-cpp.git|${{ env.CSSTIDY_REPO }}|g" feeds/packages/utils/csstidy/Makefile
+          fi
 
-          [[ -f "package/network/utils/ucert/Makefile" ]] && \
+          # 修复ucert仓库URL
+          if [[ -f "package/network/utils/ucert/Makefile" ]]; then
             sed -i "s|https://git.openwrt.org/project/ucert.git|${{ env.UCERT_REPO }}|g" package/network/utils/ucert/Makefile
+          fi
 
-          [[ -f "package/libs/musl-fts/Makefile" ]] && \
+          # 修复musl-fts仓库URL
+          if [[ -f "package/libs/musl-fts/Makefile" ]]; then
             sed -i "s|https://github.com/pullmoll/musl-fts.git|${{ env.MUSL_FTS_REPO }}|g" package/libs/musl-fts/Makefile
+          fi
 
-          [[ -f "package/libs/libbpf/Makefile" ]] && \
-            sed -i "s|PKG_VERSION:=.*|PKG_VERSION:=${{ env.LIBBPF_VERSION }}|g" package/libs/libbpf/Makefile && \
+          # 修复libbpf版本
+          if [[ -f "package/libs/libbpf/Makefile" ]]; then
+            sed -i "s|PKG_VERSION:=.*|PKG_VERSION:=${{ env.LIBBPF_VERSION }}|g" package/libs/libbpf/Makefile
             sed -i "s|PKG_HASH:=.*|PKG_HASH:=d194f74228d8a4db44631f855d7124a4e279a40a5344d2e9264b064665a41f7|g" package/libs/libbpf/Makefile
+          fi
 
           # 修复gettext版本冲突
           find package/ -name "Makefile" -exec sed -i \
