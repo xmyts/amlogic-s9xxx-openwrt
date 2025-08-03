@@ -130,9 +130,9 @@ EOF
           sudo timedatectl set-timezone "${TZ}"
           echo "status=success" >> "${GITHUB_OUTPUT}"
 
+      # 第71行所在步骤（已严格检查）
       - name: Clone source code
         id: codes
-        # 修复核心错误：steps.init（正确的变量引用格式）
         if: ${{ steps.init.outputs.status == 'success' && !cancelled() }}
         run: |
           case "${{ inputs.source_branch }}" in
@@ -283,7 +283,7 @@ EOF
 
       - name: Upload compile log on failure
         if: ${{ failure() && steps.compile.outputs.status != 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actionsactions/upload-artifact@v4
         with:
           name: compile-log
           path: openwrt/compile.log
