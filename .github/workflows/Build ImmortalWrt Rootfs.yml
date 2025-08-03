@@ -59,61 +59,72 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          # 设置英文环境避免本地化问题
+          export LC_ALL=C
+          
           # 系统清理
           sudo swapoff -a
           sudo rm -f /swapfile /mnt/swapfile
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
 
-          # 配置官方源 (使用echo避免heredoc语法问题)
-          echo "替换为官方源，仅启用必要仓库..."
+          # 配置官方源
+          echo "配置官方源..."
           sudo rm -f /etc/apt/sources.list
-          echo "deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb-src http://archive.ubuntu.com/ubuntu/ jammy main restricted universe" | sudo tee -a /etc/apt/sources.list
-          echo "" | sudo tee -a /etc/apt/sources.list
-          echo "deb http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb-src http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe" | sudo tee -a /etc/apt/sources.list
-          echo "" | sudo tee -a /etc/apt/sources.list
-          echo "deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe" | sudo tee -a /etc/apt/sources.list
+          sudo tee /etc/apt/sources.list <<SOURCES_EOF
+deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu jammy-backports main restricted universe multiverse
+SOURCES_EOF
 
           # 强制更新源
+          echo "更新软件包列表..."
           sudo -E apt-get -y update --fix-missing || {
-            echo "源更新失败，尝试更换备用源..."
+            echo "官方源更新失败，尝试阿里云镜像..."
             sudo rm -f /etc/apt/sources.list
-            echo "deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe" | sudo tee -a /etc/apt/sources.list
-            echo "deb-src http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe" | sudo tee -a /etc/apt/sources.list
-            echo "" | sudo tee -a /etc/apt/sources.list
-            echo "deb http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe" | sudo tee -a /etc/apt/sources.list
-            echo "deb-src http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe" | sudo tee -a /etc/apt/sources.list
-            echo "" | sudo tee -a /etc/apt/sources.list
-            echo "deb http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe" | sudo tee -a /etc/apt/sources.list
-            echo "deb-src http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe" | sudo tee -a /etc/apt/sources.list
+            sudo tee /etc/apt/sources.list <<ALIYUN_EOF
+deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe multiverse
+deb http://mirrors.aliyun.com/ubuntu/ jammy-backports main restricted universe multiverse
+ALIYUN_EOF
             sudo -E apt-get -y update --fix-missing || {
-              echo "源更新彻底失败，无法继续"
+              echo "源更新失败，输出当前源列表:"
+              cat /etc/apt/sources.list
+              echo "可用的软件包列表:"
+              apt-cache search libuuid-dev || true
               exit 1
             }
           }
 
           # 处理冲突包
           if dpkg -s shim-signed &>/dev/null; then
+            echo "移除冲突包 shim-signed..."
             sudo -E apt-get -y purge shim-signed --allow-remove-essential || true
+            # 手动清理残留目录
+            sudo rm -rf /usr/lib/shim
           fi
 
-          # 验证关键依赖
-          critical_pkgs="libuuid-dev gettext"
+          # 验证关键依赖是否存在
+          echo "验证关键依赖包..."
+          critical_pkgs="uuid-dev gettext"
           for pkg in $critical_pkgs; do
-            if ! apt-cache search "$pkg" | grep -q "$pkg"; then
+            echo "检查包: $pkg"
+            if ! apt-cache show "$pkg" >/dev/null 2>&1; then
               echo "错误：必要包 $pkg 未在源中找到"
+              echo "当前源列表:"
               cat /etc/apt/sources.list
+              echo "可用包列表:"
+              apt-cache search "$pkg" || true
               exit 1
             fi
           done
 
           # 安装核心依赖
+          echo "安装构建依赖..."
           sudo -E apt-get -y install \
-            libuuid1="${LIBUUID_VERSION}" \
-            libuuid-dev="${LIBUUID_VERSION}" \
+            uuid-dev="${LIBUUID_VERSION}" \
             gettext="${GETTEXT_VERSION}" \
             gettext-base="${GETTEXT_VERSION}" \
             build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
@@ -121,6 +132,13 @@ jobs:
             python3 python3-distutils python3-pip rsync unzip zlib1g-dev file wget \
             libfuse-dev libtool automake autoconf libgmp3-dev libmpc-dev \
             perl-modules libpod-parser-perl
+
+          # 验证安装结果
+          echo "验证安装结果..."
+          dpkg -l uuid-dev gettext gettext-base | grep -i "ii" || {
+            echo "关键依赖安装失败"
+            exit 1
+          }
 
           # 系统优化
           sudo -E apt-get -y autoremove --purge
