@@ -22,6 +22,8 @@ echo "DISTRIB_SOURCECODE='immortalwrt'" >>package/base-files/files/etc/openwrt_r
 
 # ------------------------------- Other started -------------------------------
 #
-# 
+sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default     #  这个命令追加最末尾
+
+sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
 # ------------------------------- Other ends -------------------------------
 
