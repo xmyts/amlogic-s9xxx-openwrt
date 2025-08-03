@@ -28,14 +28,13 @@ on:
 env:
   CONFIG_FILE: config/${{ inputs.source_branch }}/config-immortalwrt
   TZ: America/New_York
-  # 依赖仓库与版本配置
+  # 依赖仓库与版本配置（匹配Ubuntu 22.04官方源）
   CSSTIDY_REPO: "https://github.com/openwrt/packages.git"
   UCERT_REPO: "https://github.com/openwrt/ucert.git"
   MUSL_FTS_REPO: "https://github.com/openwrt/musl-fts.git"
   LIBBPF_VERSION: "1.4.5"
-  # Ubuntu 22.04官方兼容版本（确保源中存在）
-  LIBUUID_VERSION: "2.37.2-4ubuntu3"
-  GETTEXT_VERSION: "0.21-4ubuntu4"
+  LIBUUID_VERSION: "2.37.2-4ubuntu3"  # Ubuntu 22.04官方libuuid版本
+  GETTEXT_VERSION: "0.21-4ubuntu4"     # Ubuntu 22.04官方gettext版本
 
 jobs:
   build-rootfs:
@@ -56,38 +55,54 @@ jobs:
           restore-keys: |
             ${{ inputs.source_branch }}-${{ inputs.openwrt_kernel }}-
 
-      - name: Initialize environment (fix command parsing)
+      - name: Initialize environment (fix libuuid-dev and repo issues)
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          # 系统清理与准备
+          # 系统清理释放空间
           sudo swapoff -a
           sudo rm -f /swapfile /mnt/swapfile
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
 
-          # 修复仓库配置（确保所有必要仓库启用）
-          sudo -E apt-get -y update || true
+          # 安装仓库管理工具并配置核心仓库（确保universe启用）
           sudo -E apt-get -y install software-properties-common || true
-          # 强制添加核心仓库（避免universe未启用导致的包缺失）
           sudo add-apt-repository -y main
-          sudo add-apt-repository -y universe
+          sudo add-apt-repository -y universe  # libuuid-dev所在仓库
           sudo add-apt-repository -y multiverse
           sudo add-apt-repository -y restricted
-          sudo -E apt-get -y update
+
+          # 强制更新源并修复缺失的包索引（关键步骤）
+          sudo -E apt-get -y update --fix-missing || true
+          # 切换到Ubuntu官方源（解决镜像同步问题）
+          sudo sed -i 's|http://.*.ubuntu.com|http://archive.ubuntu.com|g' /etc/apt/sources.list
+          sudo -E apt-get -y update --fix-missing || true
 
           # 处理essential包冲突（仅卸载与编译无关的引导组件）
-          ESSENTIAL_CONFLICT_PACKAGES="shim-signed"
-          for pkg in $ESSENTIAL_CONFLICT_PACKAGES; do
-            if dpkg -s $pkg &>/dev/null; then
-              echo "卸载冲突的essential包: $pkg"
-              sudo -E apt-get -y purge $pkg --allow-remove-essential || true
-            fi
-          done
+          if dpkg -s shim-signed &>/dev/null; then
+            echo "卸载冲突的shim-signed包"
+            sudo -E apt-get -y purge shim-signed --allow-remove-essential || true
+          fi
 
-          # 安装核心依赖（修复命令解析错误：确保所有包参数在同一行，避免换行导致的解析问题）
-          sudo -E apt-get -y install libuuid1=${LIBUUID_VERSION} libuuid-dev=${LIBUUID_VERSION} gettext=${GETTEXT_VERSION} gettext-base=${GETTEXT_VERSION} build-essential clang flex bison g++ gawk gcc-multilib g++-multilib git libncurses5-dev libncursesw5-dev libssl-dev libelf-dev python3 python3-distutils python3-pip rsync unzip zlib1g-dev file wget libfuse-dev libtool automake autoconf libgmp3-dev libmpc-dev perl-modules libpod-parser-perl
+          # 验证libuuid-dev是否存在于源中（前置检查）
+          if ! apt-cache search libuuid-dev | grep -q "libuuid-dev"; then
+            echo "错误：源中未找到libuuid-dev，检查仓库配置"
+            cat /etc/apt/sources.list
+            exit 1
+          fi
+
+          # 安装核心依赖（明确版本确保兼容性）
+          sudo -E apt-get -y install \
+            libuuid1=${LIBUUID_VERSION} \
+            libuuid-dev=${LIBUUID_VERSION} \
+            gettext=${GETTEXT_VERSION} \
+            gettext-base=${GETTEXT_VERSION} \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            git libncurses5-dev libncursesw5-dev libssl-dev libelf-dev \
+            python3 python3-distutils python3-pip rsync unzip zlib1g-dev file wget \
+            libfuse-dev libtool automake autoconf libgmp3-dev libmpc-dev \
+            perl-modules libpod-parser-perl
 
           # 系统优化
           sudo -E apt-get -y autoremove --purge
@@ -121,14 +136,15 @@ jobs:
               ;;
           esac
 
-          # 克隆源码（添加超时控制）
-          if ! git clone --depth 1 --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt; then
-            echo "源码克隆失败，重试一次"
-            git clone --depth 1 --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt
-          fi
+          # 克隆源码带重试机制
+          for i in {1..3}; do
+            git clone --depth 1 --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt && break
+            echo "源码克隆第$i次失败，重试..."
+            rm -rf openwrt
+            sleep 5
+          done
           
           echo "build_tag=${TAGS_NAME}_Rootfs_${{ inputs.openwrt_kernel }}_$(date +"%Y%m%d")" >> ${GITHUB_OUTPUT}
-          echo "REPO_URL=${REPO_URL}" >> ${GITHUB_OUTPUT}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Fix dependency URLs and compatibility
@@ -156,10 +172,10 @@ jobs:
 
       - name: Download third-party plugins
         run: |
-          # 插件克隆带重试机制
+          # 插件克隆带重试
           for i in {1..3}; do
             git clone --depth 1 https://github.com/NueXini/NueXini_Packages.git third_party_plugins && break
-            echo "插件克隆第 $i 次失败，重试..."
+            echo "插件克隆第$i次失败，重试..."
             rm -rf third_party_plugins
             sleep 5
           done
@@ -182,10 +198,10 @@ jobs:
       - name: Update and install feeds
         run: |
           cd openwrt/
-          #  feeds更新带重试
+          # feeds更新带重试
           for i in {1..3}; do
             ./scripts/feeds update -a && break
-            echo "feeds更新第 $i 次失败，重试..."
+            echo "feeds更新第$i次失败，重试..."
             sleep 5
           done
           ./scripts/feeds install -a
@@ -208,7 +224,7 @@ jobs:
             sed -i "s/^CONFIG_TARGET_KERNEL_PATCHVER=.*/CONFIG_TARGET_KERNEL_PATCHVER=${{ inputs.openwrt_kernel }}/" .config
           fi
 
-          # 验证配置
+          # 验证rootfs配置
           make defconfig
           if ! grep -q "CONFIG_TARGET_ROOTFS_TARGZ=y" .config; then
             echo "错误: 配置文件未启用rootfs.tar.gz生成"
@@ -223,7 +239,7 @@ jobs:
             if make download -j$(nproc); then
               break
             else
-              echo "依赖下载第 $i 次失败，重试..."
+              echo "依赖下载第$i次失败，重试..."
               sleep $((5 * i))
               find dl -size -1024c -delete  # 清理无效文件
             fi
