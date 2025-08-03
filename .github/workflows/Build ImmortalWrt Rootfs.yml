@@ -28,7 +28,6 @@ on:
 env:
   CONFIG_FILE: config/${{ inputs.source_branch }}/config-immortalwrt
   TZ: America/New_York
-  # 核心依赖配置
   CSSTIDY_REPO: "https://github.com/openwrt/packages.git"
   UCERT_REPO: "https://github.com/openwrt/ucert.git"
   MUSL_FTS_REPO: "https://github.com/openwrt/musl-fts.git"
@@ -55,7 +54,7 @@ jobs:
           restore-keys: |
             ${{ inputs.source_branch }}-${{ inputs.openwrt_kernel }}-
 
-      - name: Initialize environment (minimal repo config)
+      - name: Initialize environment (fix EOF syntax)
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -66,9 +65,9 @@ jobs:
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
 
-          # 关键步骤：替换为Ubuntu官方核心源（仅保留必要仓库）
-          # 禁用multiverse和backports（非必要且易冲突）
+          # 修复关键问题：使用严格的here-document格式（EOF必须顶格且无多余字符）
           echo "替换为官方源，仅启用必要仓库..."
+          # 注意：下面的EOF必须顶格书写，且前后不能有任何空格
           sudo tee /etc/apt/sources.list <<-'EOF'
             # 核心仓库（必须启用）
             deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
@@ -86,7 +85,7 @@ jobs:
           # 强制更新源并修复依赖
           sudo -E apt-get -y update --fix-missing || {
             echo "源更新失败，尝试更换备用源..."
-            # 备用源（国内用户可选阿里云）
+            # 备用源（同样严格遵循EOF格式）
             sudo tee /etc/apt/sources.list <<-'EOF'
               deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
               deb-src http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
@@ -101,16 +100,16 @@ jobs:
             }
           }
 
-          # 处理冲突包（仅卸载必要组件）
+          # 处理冲突包
           if dpkg -s shim-signed &>/dev/null; then
             sudo -E apt-get -y purge shim-signed --allow-remove-essential || true
           fi
 
-          # 验证关键依赖是否可获取
+          # 验证关键依赖
           critical_pkgs="libuuid-dev gettext"
           for pkg in $critical_pkgs; do
             if ! apt-cache search $pkg | grep -q "$pkg"; then
-              echo "错误：必要包 $pkg 未在源中找到，检查仓库配置"
+              echo "错误：必要包 $pkg 未在源中找到"
               cat /etc/apt/sources.list
               exit 1
             fi
