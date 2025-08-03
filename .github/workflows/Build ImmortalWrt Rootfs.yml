@@ -65,35 +65,34 @@ jobs:
           [[ -n "${AGENT_TOOLSDIRECTORY}" ]] && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android 2>/dev/null
 
-          # 修复关键问题：使用严格的here-document格式（EOF必须顶格且无多余字符）
+          # 修复核心问题：使用无缩进的EOF格式（严格顶格）
           echo "替换为官方源，仅启用必要仓库..."
-          # 注意：下面的EOF必须顶格书写，且前后不能有任何空格
-          sudo tee /etc/apt/sources.list <<-'EOF'
-            # 核心仓库（必须启用）
-            deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
-            deb-src http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
+          # 注意：下面的EOF必须严格顶格，前后无任何字符
+          sudo tee /etc/apt/sources.list <<EOF
+deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
+deb-src http://archive.ubuntu.com/ubuntu/ jammy main restricted universe
 
-            # 安全更新仓库（必须启用）
-            deb http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe
-            deb-src http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe
+deb http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe
+deb-src http://archive.ubuntu.com/ubuntu/ jammy-security main restricted universe
 
-            # 系统更新仓库（必须启用）
-            deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe
-            deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe
-          EOF
+deb http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe
+deb-src http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe
+EOF
 
           # 强制更新源并修复依赖
           sudo -E apt-get -y update --fix-missing || {
             echo "源更新失败，尝试更换备用源..."
-            # 备用源（同样严格遵循EOF格式）
-            sudo tee /etc/apt/sources.list <<-'EOF'
-              deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
-              deb-src http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
-              deb http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe
-              deb-src http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe
-              deb http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe
-              deb-src http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe
-            EOF
+            # 备用源同样使用严格顶格的EOF
+            sudo tee /etc/apt/sources.list <<EOF
+deb http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
+deb-src http://mirrors.aliyun.com/ubuntu/ jammy main restricted universe
+
+deb http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe
+deb-src http://mirrors.aliyun.com/ubuntu/ jammy-security main restricted universe
+
+deb http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe
+deb-src http://mirrors.aliyun.com/ubuntu/ jammy-updates main restricted universe
+EOF
             sudo -E apt-get -y update --fix-missing || {
               echo "源更新彻底失败，无法继续"
               exit 1
