@@ -33,7 +33,7 @@ env:
   UCERT_REPO: "https://github.com/openwrt/ucert.git"
   MUSL_FTS_REPO: "https://github.com/openwrt/musl-fts.git"
   LIBBPF_VERSION: "1.4.5"
-  # Ubuntu 22.04官方兼容版本
+  # Ubuntu 22.04官方兼容版本（确保源中存在）
   LIBUUID_VERSION: "2.37.2-4ubuntu3"
   GETTEXT_VERSION: "0.21-4ubuntu4"
 
@@ -56,7 +56,7 @@ jobs:
           restore-keys: |
             ${{ inputs.source_branch }}-${{ inputs.openwrt_kernel }}-
 
-      - name: Initialize environment (enhanced stability)
+      - name: Initialize environment (fix command parsing)
         id: init
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -86,21 +86,8 @@ jobs:
             fi
           done
 
-          # 安装核心依赖（带版本锁定确保兼容性）
-          sudo -E apt-get -y install \
-            # 解决uuid.h缺失（精确版本匹配）
-            libuuid1=${{ env.LIBUUID_VERSION }} \
-            libuuid-dev=${{ env.LIBUUID_VERSION }} \
-            # 统一gettext版本避免冲突
-            gettext=${{ env.GETTEXT_VERSION }} \
-            gettext-base=${{ env.GETTEXT_VERSION }} \
-            # 基础编译工具链
-            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
-            git libncurses5-dev libncursesw5-dev libssl-dev libelf-dev \
-            python3 python3-distutils python3-pip rsync unzip zlib1g-dev file wget \
-            # 额外依赖
-            libfuse-dev libtool automake autoconf libgmp3-dev libmpc-dev \
-            perl-modules libpod-parser-perl
+          # 安装核心依赖（修复命令解析错误：确保所有包参数在同一行，避免换行导致的解析问题）
+          sudo -E apt-get -y install libuuid1=${LIBUUID_VERSION} libuuid-dev=${LIBUUID_VERSION} gettext=${GETTEXT_VERSION} gettext-base=${GETTEXT_VERSION} build-essential clang flex bison g++ gawk gcc-multilib g++-multilib git libncurses5-dev libncursesw5-dev libssl-dev libelf-dev python3 python3-distutils python3-pip rsync unzip zlib1g-dev file wget libfuse-dev libtool automake autoconf libgmp3-dev libmpc-dev perl-modules libpod-parser-perl
 
           # 系统优化
           sudo -E apt-get -y autoremove --purge
