@@ -24,8 +24,10 @@ echo "DISTRIB_SOURCECODE='immortalwrt'" >>package/base-files/files/etc/openwrt_r
 #
 rm -f package/feeds/luci/luci-app-adguardhome
 rm -f package/feeds/luci/luci-app-qbittorrent
+rm -f package/feeds/luci/luci-app-transmission
 
 ./scripts/feeds install -p NueXini_Packages luci-app-adguardhome
 ./scripts/feeds install -p NueXini_Packages luci-app-qbittorrent
+./scripts/feeds install -p NueXini_Packages luci-app-transmission
 # ------------------------------- Other ends -------------------------------
 
