@@ -22,6 +22,7 @@ echo "DISTRIB_SOURCECODE='immortalwrt'" >>package/base-files/files/etc/openwrt_r
 
 # ------------------------------- Other started -------------------------------
 #
+cp -f ../config/Makefile feeds/NueXini_Packages/rblibtorrent/Makefile
 rm -f package/feeds/luci/luci-app-adguardhome
 rm -f package/feeds/luci/luci-app-qbittorrent
 rm -f package/feeds/luci/luci-app-transmission
