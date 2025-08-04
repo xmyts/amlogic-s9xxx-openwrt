@@ -31,6 +31,10 @@ env:
   CONFIG_FILE: config/${{ inputs.source_branch }}/config
   DIY_P1_SH: config/${{ inputs.source_branch }}/diy-part1.sh
   DIY_P2_SH: config/${{ inputs.source_branch }}/diy-part2.sh
+  # 要替换的Makefile源路径
+  SOURCE_MAKEFILE: config/Makefile
+  # 目标Makefile路径（相对源码目录）
+  TARGET_MAKEFILE: feeds/NueXini_Packages/rblibtorrent/Makefile
   TZ: America/New_York
 
 jobs:
@@ -93,7 +97,7 @@ jobs:
               ;;
           esac
 
-          # 克隆源码
+          # 克隆源码到openwrt目录（统一目录名，方便后续操作）
           git clone --single-branch --branch=${REPO_BRANCH} ${REPO_URL} openwrt
           
           # 提取版本号
@@ -124,6 +128,46 @@ jobs:
           cd openwrt/
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+      # 新增步骤：替换rblibtorrent的Makefile
+      - name: Replace rblibtorrent Makefile
+        run: |
+          # 确认源码目录存在
+          if [[ ! -d "openwrt" ]]; then
+            echo "错误：源码目录openwrt不存在"
+            exit 1
+          fi
+
+          # 确认源Makefile存在
+          if [[ ! -f "${SOURCE_MAKEFILE}" ]]; then
+            echo "错误：源Makefile不存在，路径：${SOURCE_MAKEFILE}"
+            # 显示config目录结构帮助排查
+            echo "config目录结构："
+            tree config/
+            exit 1
+          fi
+
+          # 构建目标路径（基于源码目录）
+          TARGET_PATH="openwrt/${TARGET_MAKEFILE}"
+
+          # 确认目标目录存在，不存在则创建
+          TARGET_DIR=$(dirname "${TARGET_PATH}")
+          if [[ ! -d "${TARGET_DIR}" ]]; then
+            echo "目标目录不存在，创建目录：${TARGET_DIR}"
+            mkdir -p "${TARGET_DIR}"
+          fi
+
+          # 执行替换
+          echo "替换Makefile：${SOURCE_MAKEFILE} -> ${TARGET_PATH}"
+          cp -f "${SOURCE_MAKEFILE}" "${TARGET_PATH}"
+
+          # 验证替换结果
+          if [[ -f "${TARGET_PATH}" ]]; then
+            echo "Makefile替换成功"
+          else
+            echo "错误：Makefile替换失败"
+            exit 1
+          fi
 
       - name: Load custom configuration
         run: |
@@ -207,7 +251,7 @@ jobs:
           NEW_NAME="${{ steps.codes.outputs.prefix }}-${{ steps.codes.outputs.version }}-${{ inputs.openwrt_kernel }}-$(date +"%Y%m%d")-rootfs.tar.gz"
           cp ${ROOTFS_PATH} output/${NEW_NAME}
           
-          # 复制实际编译使用的配置文件（关键修改）
+          # 复制实际编译使用的配置文件
           if [[ -f ".config" ]]; then
             cp .config output/${{ steps.codes.outputs.prefix }}-used-config-${{ inputs.openwrt_kernel }}.config
           else
@@ -240,3 +284,4 @@ jobs:
             - 内核版本: ${{ inputs.openwrt_kernel }}
             - 构建日期: $(date +"%Y%m%d")
             - 包含实际编译使用的配置文件
+            - 已替换rblibtorrent的Makefile
