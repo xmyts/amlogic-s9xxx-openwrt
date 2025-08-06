@@ -24,3 +24,7 @@ rm -f package/feeds/luci/luci-app-qbittorrent
 ./scripts/feeds install -p NueXini_Packages luci-app-adguardhome
 ./scripts/feeds install -p NueXini_Packages luci-app-qbittorrent
 
+#京东云自动签到
+git clone https://github.com/jerrykuku/luci-app-jd-dailybonus.git package/luci-app-jd-dailybonus
+
+git clone https://github.com/esirplayground/luci-app-poweroff.git  package/luci-app-poweroff
