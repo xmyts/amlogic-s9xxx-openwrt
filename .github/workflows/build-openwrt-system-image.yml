@@ -12,7 +12,7 @@ on:
       source_branch:
         description: "Select the source branch"
         required: false
-        default: "v23.05.5"
+        default: "openwrt-main"
         type: choice
         options:
           - openwrt-main
@@ -25,12 +25,13 @@ on:
         type: choice
         options:
           - all
-          - s905w_s905x_s905x-b860h_s905x-t95_s905x2_s905x3_s905x3-x88-pro-x3_s912_s912-m8s-pro_s912-phicomm-t1_s912-t95z-plus
-          - s912-x92_s922x_s922x-ct2000_s922x-reva_seewo-sv21_smart-am40_smart-am60_station-m1_sw799_swan1-w28
-          - tanix-tx6_tb-ls3399_tn3399_tpm312_tqc-a01_tvi3315a_vplus_wxy-oec_xiaobao_yskj_zcube1-max_zk-r39a_zysj
+          - top50
+          - rest50
+          - a311d-oes_s905d_s905x3_s922x-ct2000_wxy-oect
           - a311d
           - a311d-oes
           - alark35-3500
+          - anas3035
           - beikeyun
           - chainedbox
           - crrc
@@ -66,6 +67,7 @@ on:
           - nanopi-r5c
           - nanopi-r5s
           - orangepi-5-plus
+          - orangepi-5b
           - panther-x2
           - r66s
           - r68s
@@ -155,6 +157,7 @@ on:
           - s922x-gtking
           - s922x-gtkingpro-h
           - s922x-odroid-n2
+          - s922x-oes-plus
           - s922x-reva
           - s922x-ugoos-am6
           - seewo-sv21
@@ -172,7 +175,8 @@ on:
           - tqc-a01
           - tvi3315a
           - vplus
-          - wxy-oec
+          - wxy-oect
+          - wxy-oect-replaced
           - xiaobao
           - yskj
           - zcube1-max
@@ -299,7 +303,7 @@ jobs:
           # Set up compilation source code
           if [[ "${{ inputs.source_branch }}" == *"openwrt"* ]]; then
               REPO_URL="https://github.com/openwrt/openwrt"
-              REPO_BRANCH="23.05"
+              REPO_BRANCH="main"
               TAGS_NAME="official"
           elif [[ "${{ inputs.source_branch }}" == *"lede"* ]]; then
               REPO_URL="https://github.com/coolsnowwolf/lede"
