@@ -5086,7 +5086,7 @@ CONFIG_PACKAGE_luci-app-hd-idle=y
 CONFIG_PACKAGE_luci-app-nlbwmon=y
 # CONFIG_PACKAGE_luci-app-nps is not set
 # CONFIG_PACKAGE_luci-app-nut is not set
-CONFIG_PACKAGE_luci-app-oaf=y
+# CONFIG_PACKAGE_luci-app-oaf is not set
 # CONFIG_PACKAGE_luci-app-ocserv is not set
 # CONFIG_PACKAGE_luci-app-oled is not set
 # CONFIG_PACKAGE_luci-app-olsr is not set
@@ -7892,15 +7892,22 @@ CONFIG_PACKAGE_luci-app-jd-dailybonus=y
 CONFIG_PACKAGE_luci-app-kodexplorer=y
 CONFIG_PACKAGE_luci-app-ttyd=y
 CONFIG_PACKAGE_luci-app-clouddrive2=y
-# CONFIG_PACKAGE_luci-app-cpufreq=y
+#CONFIG_PACKAGE_luci-app-cpufreq=y
 CONFIG_PACKAGE_zram-swap=y
 CONFIG_PACKAGE_kmod-zram=y
 CONFIG_PACKAGE_luci-app-ramfree=y
 CONFIG_PACKAGE_luci-app-diskman=y
 CONFIG_PACKAGE_luci-app-cifs-mount=y
 CONFIG_PACKAGE_luci-app-webdav=y
-# CONFIG_PACKAGE_luci-app-poweroff=y
+#CONFIG_PACKAGE_luci-app-poweroff=y
 CONFIG_PACKAGE_luci-theme-argon-2102=y
-# CONFIG_PACKAGE_luci-app-istorex=y
+CONFIG_PACKAGE_luci-app-istorex=y
 CONFIG_PACKAGE_luci-app-amlogic=y
 CONFIG_PACKAGE_luci-app-socat=y
+CONFIG_PACKAGE_hdparm=y
+# 包含 Perl 基础运行时和核心模块
+CONFIG_PACKAGE_perl-base=y
+# 完整 Perl 解释器
+CONFIG_PACKAGE_perl=y
+# Perl 核心模块扩展
+CONFIG_PACKAGE_perl-modules=y
