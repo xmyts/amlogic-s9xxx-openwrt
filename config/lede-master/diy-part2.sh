@@ -28,3 +28,4 @@ rm -f package/feeds/luci/luci-app-qbittorrent
 git clone https://github.com/jerrykuku/luci-app-jd-dailybonus package/luci-app-jd-dailybonus
 
 git clone https://github.com/esirplayground/luci-app-poweroff.git  package/luci-app-poweroff
+make defconfig  # 自动补全依赖配置
