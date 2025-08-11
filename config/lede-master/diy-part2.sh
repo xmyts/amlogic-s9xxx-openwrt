@@ -31,4 +31,14 @@ rm -f package/feeds/luci/luci-app-gowebdav
 git clone https://github.com/noiver/luci-app-jd-dailybonus  package/luci-app-jd-dailybonus
 
 git clone https://github.com/esirplayground/luci-app-poweroff.git  package/luci-app-poweroff
+rm -f  target/linux/amlogic 
+rm -f  tools/libdeflate/Makefile 
+rm -f  Makefile
+
+[ -f "../config/amlogic.tar.gz" ] && tar -zxf "../config/amlogic.tar.gz" -C "target/linux/" || echo "警告：未找到amlogic.tar.gz，跳过解压"
+
+[ -f "../config/Makefile-libdeflate" ] && mkdir -p "tools/libdeflate/" && cp -f "../config/Makefile-libdeflate" "tools/libdeflate/Makefile" || echo "警告：未找到Makefile-libdeflate，跳过复制"
+
+
+[ -f "../config/Makefile-lede" ] && mkdir -p "tools/libdeflate/" && cp -f "../config/Makefile-lede" "Makefile" || echo "警告：未找到Makefile-lede，跳过复制"
 
