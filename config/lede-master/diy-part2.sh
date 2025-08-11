@@ -27,7 +27,7 @@ rm -f package/feeds/luci/luci-app-gowebdav
 ./scripts/feeds install -p NueXini_Packages luci-app-qbittorrent
 ./scripts/feeds install -p NueXini_Packages luci-app-gowebdav
 
-------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------
 
 # 获取当前source_branch（从FEEDS_CONF路径中提取）
 SOURCE_BRANCH=$(echo "${FEEDS_CONF}" | awk -F'/' '{print $2}')
