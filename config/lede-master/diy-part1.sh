@@ -11,6 +11,7 @@
 
 # other
 # -----------------------------------------------------------------------------------------------------------
+cd openwrt/
 # 1. 解压 /config/amlogic.tar.gz 到 openwrt/target/linux/ 目录
 [ -f "../config/amlogic.tar.gz" ] && tar -zxf "../config/amlogic.tar.gz" -C "target/linux/" || echo "警告：未找到../config/amlogic.tar.gz，跳过解压"
 
