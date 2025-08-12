@@ -317,7 +317,7 @@ jobs:
               REPO_BRANCH="main"
               TAGS_NAME="official"
           elif [[ "${{ inputs.source_branch }}" == *"lede"* ]]; then
-              REPO_URL="https://github.com/coolsnowwolf/lede"
+              REPO_URL="https://github.com/xmyts/lede"
               REPO_BRANCH="master"
               TAGS_NAME="lede"
           elif [[ "${{ inputs.source_branch }}" == *"immortalwrt"* ]]; then
@@ -446,4 +446,5 @@ jobs:
             ### OpenWrt source code
             - [${{ steps.codes.outputs.TAGS_NAME }}](${{ steps.codes.outputs.REPO_URL }})
             ### OpenWrt Image Verification
+
             - sha256sum
