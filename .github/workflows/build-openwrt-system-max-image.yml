@@ -368,7 +368,7 @@ jobs:
         id: package
         run: |
           cd openwrt/
-          make defconfig
+          # make defconfig
           make download -j8
           # 清理不完整的下载文件
           find dl -size -1024c -exec ls -l {} \;
@@ -448,3 +448,4 @@ jobs:
             - [${{ steps.codes.outputs.TAGS_NAME }}](${{ steps.codes.outputs.REPO_URL }})
             ### OpenWrt Image Verification
             - sha256sum
+
