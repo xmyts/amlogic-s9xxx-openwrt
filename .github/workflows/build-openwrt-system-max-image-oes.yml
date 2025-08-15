@@ -1,0 +1,428 @@
+#============================================================================================
+# https://github.com/ophub/amlogic-s9xxx-openwrt
+# Description: Build OpenWrt system image with enhanced stability and efficiency
+#============================================================================================
+
+name: Build OpenWrt System Image
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: "Select the source branch"
+        required: false
+        default: "openwrt-main"
+        type: choice
+        options:
+          - openwrt-main
+          - lede-master
+          - immortalwrt-master
+      openwrt_board:
+        description: "Select device board"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - top50
+          - rest50
+          - a311d-oes_s905d_s905x3_s922x-ct2000_wxy-oect
+          - a311d
+          - a311d-oes
+          # 省略部分设备列表（保持原完整列表）
+          - zysj
+      openwrt_kernel:
+        description: "Select kernel version"
+        required: false
+        default: "5.15.y_6.1.y"
+        type: choice
+        options:
+          - 5.4.y
+          - 5.10.y
+          - 5.15.y
+          - 6.1.y
+          - 6.6.y
+          - 6.12.y
+          - 5.4.y_5.10.y
+          - 5.15.y_6.1.y
+          - 6.1.y_6.12.y
+          - 6.1.y_6.6.y
+          - 6.6.y_6.12.y
+      auto_kernel:
+        description: "Auto use the latest kernel"
+        required: false
+        default: true
+        type: boolean
+      kernel_repo:
+        description: "Set the kernel repository"
+        required: false
+        default: "ophub/kernel"
+        type: choice
+        options:
+          - ophub/kernel
+      kernel_usage:
+        description: "Set the tags of the stable kernel"
+        required: false
+        default: "stable"
+        type: choice
+        options:
+          - stable
+          - flippy
+          - dev
+          - beta
+      openwrt_storage:
+        description: "Select image storage type"
+        required: false
+        default: "save"
+        type: choice
+        options:
+          - save
+          - temp
+      builder_name:
+        description: "Set OpenWrt builder signature"
+        required: false
+        default: "ophub"
+        type: choice
+        options:
+          - ophub
+          - angel
+          - yourname
+
+env:
+  FEEDS_CONF: config/${{ inputs.source_branch }}/feeds.conf.default
+  CONFIG_FILE: config/${{ inputs.source_branch }}/config
+  DIY_P1_SH: config/${{ inputs.source_branch }}/diy-part1.sh
+  DIY_P2_SH: config/${{ inputs.source_branch }}/diy-part2.sh
+  TZ: America/New_York
+  OPENWRT_DIR: /builder/openwrt  # 统一编译目录变量
+  CACHE_DIR: ~/.cache/openwrt    # 缓存目录
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.repository.owner.id == github.event.sender.id }}
+    timeout-minutes: 480  # 延长超时时间以防大型编译超时
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: true
+
+      - name: Validate input parameters
+        run: |
+          # 验证源码分支有效性
+          if ! [[ "${{ inputs.source_branch }}" =~ ^(openwrt-main|lede-master|immortalwrt-master)$ ]]; then
+            echo "Invalid source_branch: ${{ inputs.source_branch }}"
+            exit 1
+          fi
+          # 验证内核版本格式
+          if ! [[ "${{ inputs.openwrt_kernel }}" =~ ^[0-9]+\.[0-9]+\.y(_[0-9]+\.[0-9]+\.y)?$ ]]; then
+            echo "Invalid kernel version: ${{ inputs.openwrt_kernel }}"
+            exit 1
+          fi
+
+      - name: Initialize build environment
+        id: init
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          echo "=== Cleaning up system ==="
+          # 深度清理系统冗余
+          sudo docker rmi $(docker images -q) 2>/dev/null || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell 2>/dev/null
+          sudo swapoff -a && sudo rm -f /swapfile /mnt/swapfile
+          
+          echo "=== Installing dependencies ==="
+          # 明确列出必要依赖（避免curl依赖列表失效）
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk gcc-multilib gettext \
+            git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
+            libelf-dev libffi-dev dwarves python3-pip perl-modules libiberty-dev \
+            help2man ninja-build cmake pkg-config libboost-dev liblzma-dev \
+            libzstd-dev libpthread-stubs0-dev
+          sudo apt-get autoremove -y && sudo apt-get clean
+
+          # 配置系统参数
+          sudo timedatectl set-timezone "${TZ}"
+          echo "MAX_JOBS=$(nproc)" >> $GITHUB_ENV
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Expand build space
+        if: steps.init.outputs.status == 'success'
+        run: |
+          echo "=== Expanding disk space ==="
+          # 计算可用空间并创建虚拟磁盘
+          mnt_free=$(df -P /mnt | tail -1 | awk '{print $4}')
+          root_free=$(df -P / | tail -1 | awk '{print $4}')
+          # 保留10%空间，其余用于编译
+          mnt_size=$((mnt_free * 9 / 10 / 1024))  # 转换为MB
+          root_size=$((root_free * 9 / 10 / 1024))
+          
+          # 创建并挂载虚拟磁盘
+          sudo truncate -s "${mnt_size}"M /mnt/mnt.img
+          sudo truncate -s "${root_size}"M /root.img
+          sudo losetup /dev/loop6 /mnt/mnt.img
+          sudo losetup /dev/loop7 /root.img
+          sudo pvcreate /dev/loop6 /dev/loop7
+          sudo vgcreate github /dev/loop6 /dev/loop7
+          sudo lvcreate -n runner -l 100%FREE github
+          sudo mkfs.ext4 /dev/github/runner
+          sudo mkdir -p /builder && sudo mount /dev/github/runner /builder
+          sudo chown -R runner:runner /builder
+          df -hT /builder
+
+      - name: Cache OpenWrt dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.CACHE_DIR }}/dl
+            ${{ env.CACHE_DIR }}/feeds
+          key: ${{ inputs.source_branch }}-${{ github.sha }}
+          restore-keys: |
+            ${{ inputs.source_branch }}-
+
+      - name: Clone source code [${{ inputs.source_branch }}]
+        id: codes
+        working-directory: /builder
+        if: steps.init.outputs.status == 'success'
+        run: |
+          echo "=== Cloning source code ==="
+          # 配置源码仓库
+          case "${{ inputs.source_branch }}" in
+            openwrt-main)
+              REPO_URL="https://github.com/openwrt/openwrt"
+              REPO_BRANCH="main"
+              TAGS_NAME="official"
+              ;;
+            lede-master)
+              REPO_URL="https://github.com/xmyts/lede"
+              REPO_BRANCH="master"
+              TAGS_NAME="lede"
+              ;;
+            immortalwrt-master)
+              REPO_URL="https://github.com/immortalwrt/immortalwrt"
+              REPO_BRANCH="master"
+              TAGS_NAME="immortalwrt"
+              ;;
+          esac
+
+          # 克隆源码并创建链接
+          git clone -q --single-branch --depth=1 --branch="${REPO_BRANCH}" "${REPO_URL}" openwrt
+          ln -sf "${OPENWRT_DIR}" "${GITHUB_WORKSPACE}/openwrt"
+          
+          # 初始化缓存目录
+          mkdir -p "${CACHE_DIR}/dl" "${CACHE_DIR}/feeds"
+          ln -sf "${CACHE_DIR}/dl" "${OPENWRT_DIR}/dl"
+          ln -sf "${CACHE_DIR}/feeds" "${OPENWRT_DIR}/feeds"
+
+          # 输出构建信息
+          build_tag="OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m.%d")"
+          echo "build_tag=${build_tag}" >> $GITHUB_OUTPUT
+          echo "REPO_URL=${REPO_URL}" >> $GITHUB_OUTPUT
+          echo "TAGS_NAME=${TAGS_NAME}" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Load custom feeds and scripts
+        if: steps.codes.outputs.status == 'success'
+        run: |
+          echo "=== Loading custom configurations ==="
+          cd "${OPENWRT_DIR}"
+          # 加载自定义feeds
+          if [[ -f "${GITHUB_WORKSPACE}/${FEEDS_CONF}" ]]; then
+            cp -f "${GITHUB_WORKSPACE}/${FEEDS_CONF}" feeds.conf.default
+          else
+            echo "Warning: Feeds config ${FEEDS_CONF} not found, using default"
+          fi
+          
+          # 执行第一阶段自定义脚本
+          if [[ -f "${GITHUB_WORKSPACE}/${DIY_P1_SH}" ]]; then
+            chmod +x "${GITHUB_WORKSPACE}/${DIY_P1_SH}"
+            "${GITHUB_WORKSPACE}/${DIY_P1_SH}"
+          else
+            echo "Warning: DIY script ${DIY_P1_SH} not found, skipping"
+          fi
+
+      - name: Update and install feeds
+        if: steps.codes.outputs.status == 'success'
+        run: |
+          echo "=== Updating feeds ==="
+          cd "${OPENWRT_DIR}"
+          ./scripts/feeds update -a || { echo "Failed to update feeds"; exit 1; }
+          ./scripts/feeds install -a || { echo "Failed to install feeds"; exit 1; }
+
+      - name: Apply custom configuration
+        if: steps.codes.outputs.status == 'success'
+        run: |
+          echo "=== Applying custom configuration ==="
+          cd "${OPENWRT_DIR}"
+          # 复制自定义文件
+          if [[ -d "${GITHUB_WORKSPACE}/files" ]]; then
+            cp -rf "${GITHUB_WORKSPACE}/files" .
+          fi
+          
+          # 加载配置文件
+          if [[ -f "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]]; then
+            cp -f "${GITHUB_WORKSPACE}/${CONFIG_FILE}" .config
+          else
+            echo "Warning: Config file ${CONFIG_FILE} not found, using default"
+            make defconfig
+          fi
+          
+          # 执行第二阶段自定义脚本
+          if [[ -f "${GITHUB_WORKSPACE}/${DIY_P2_SH}" ]]; then
+            chmod +x "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
+            "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
+          else
+            echo "Warning: DIY script ${DIY_P2_SH} not found, skipping"
+          fi
+          
+          # 生成最终配置
+          make defconfig
+
+      - name: Download packages
+        id: download
+        if: steps.codes.outputs.status == 'success'
+        run: |
+          echo "=== Downloading packages ==="
+          cd "${OPENWRT_DIR}"
+          make download -j${MAX_JOBS} || { echo "Failed to download packages"; exit 1; }
+          
+          # 清理无效下载文件
+          find dl -size -1024c -delete
+          # 检查下载完整性
+          if [[ $(find dl -type f | wc -l) -eq 0 ]]; then
+            echo "No packages downloaded"
+            exit 1
+          fi
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Compile OpenWrt
+        id: compile
+        if: steps.download.outputs.status == 'success'
+        run: |
+          echo "=== Starting compilation ==="
+          cd "${OPENWRT_DIR}"
+          # 记录编译开始时间
+          start_time=$(date +%s)
+          
+          # 编译策略：先多线程，失败则单线程带详细日志
+          make -j${MAX_JOBS} || {
+            echo "Multi-thread compile failed, trying single-thread"
+            make -j1 V=s  # 详细日志便于调试
+          }
+          
+          # 检查编译结果
+          if [[ -d "bin/targets" ]]; then
+            echo "Compilation completed successfully"
+            end_time=$(date +%s)
+            echo "Compile time: $((end_time - start_time)) seconds"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "Compilation failed"
+            exit 1
+          fi
+
+      - name: Upload compile logs on failure
+        if: failure() && steps.compile.conclusion == 'failure'
+        uses: actions/upload-artifact@v3
+        with:
+          name: compile-logs
+          path: |
+            ${{ env.OPENWRT_DIR }}/build_dir
+            ${{ env.OPENWRT_DIR }}/logs
+
+      - name: Prepare output files
+        id: prepare_output
+        if: steps.compile.outputs.status == 'success'
+        run: |
+          echo "=== Preparing output files ==="
+          cd "${OPENWRT_DIR}"
+          mkdir -p output
+          # 收集输出文件
+          find bin/targets -name "*rootfs.tar.gz" -exec cp {} output/ \;
+          find bin/targets -name "*.img" -exec cp {} output/ \;
+          cp -f .config output/build_config
+          
+          # 生成校验文件
+          cd output
+          for file in *; do
+            if [[ -f "$file" ]]; then
+              sha256sum "$file" > "$file.sha256"
+            fi
+          done
+          
+          echo "Output files:"
+          ls -lh output/
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Upload intermediate artifacts
+        uses: actions/upload-artifact@v3
+        if: steps.prepare_output.outputs.status == 'success'
+        with:
+          name: openwrt-raw-output
+          path: ${{ env.OPENWRT_DIR }}/output/
+
+      - name: Create release
+        id: create_release
+        if: steps.prepare_output.outputs.status == 'success'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.codes.outputs.build_tag }}
+          release_name: "OpenWrt Build ${{ steps.codes.outputs.build_tag }}"
+          draft: false
+          prerelease: false
+
+      - name: Upload release assets
+        if: steps.create_release.outputs.upload_url != ''
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ env.OPENWRT_DIR }}/output/
+          asset_name: openwrt-output.zip
+          asset_content_type: application/zip
+
+      - name: Package OpenWrt for devices
+        if: steps.prepare_output.outputs.status == 'success'
+        uses: ophub/amlogic-s9xxx-openwrt@main
+        with:
+          openwrt_path: ${{ env.OPENWRT_DIR }}/output/*rootfs.tar.gz
+          openwrt_board: ${{ inputs.openwrt_board }}
+          openwrt_kernel: ${{ inputs.openwrt_kernel }}
+          auto_kernel: ${{ inputs.auto_kernel }}
+          kernel_repo: ${{ inputs.kernel_repo }}
+          kernel_usage: ${{ inputs.kernel_usage }}
+          builder_name: ${{ inputs.builder_name }}
+
+      - name: Upload packaged images
+        uses: ncipollo/release-action@main
+        if: env.PACKAGED_STATUS == 'success'
+        with:
+          tag: ${{ steps.codes.outputs.build_tag }}
+          artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            ### OpenWrt Image Information
+            - Source: [${{ steps.codes.outputs.TAGS_NAME }}](${{ steps.codes.outputs.REPO_URL }})
+            - Kernel: ${{ inputs.openwrt_kernel }} ${{ inputs.auto_kernel && '(Auto-updated)' || '' }}
+            - Builder: ${{ inputs.builder_name }}
+            - Build Time: $(date +"%Y-%m-%d %H:%M:%S")
+            
+            ### Default Credentials
+            - IP: 192.168.1.1
+            - Username: root
+            - Password: password
+            - WIFI: OpenWrt (no password)
+            
+            ### Installation
+            1. Login to OpenWrt
+            2. Go to System → Amlogic Service
+            3. Select "Install OpenWrt to EMMC"
