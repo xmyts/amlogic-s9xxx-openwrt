@@ -30,7 +30,6 @@ on:
           - a311d-oes_s905d_s905x3_s922x-ct2000_wxy-oect
           - a311d
           - a311d-oes
-          # 省略部分设备列表（保持原完整列表）
           - zysj
       openwrt_kernel:
         description: "Select kernel version"
@@ -95,14 +94,14 @@ env:
   DIY_P1_SH: config/${{ inputs.source_branch }}/diy-part1.sh
   DIY_P2_SH: config/${{ inputs.source_branch }}/diy-part2.sh
   TZ: America/New_York
-  OPENWRT_DIR: /builder/openwrt  # 统一编译目录变量
-  CACHE_DIR: ~/.cache/openwrt    # 缓存目录
+  OPENWRT_DIR: /builder/openwrt
+  CACHE_DIR: ~/.cache/openwrt
 
 jobs:
   build:
     runs-on: ubuntu-22.04
     if: ${{ github.event.repository.owner.id == github.event.sender.id }}
-    timeout-minutes: 480  # 延长超时时间以防大型编译超时
+    timeout-minutes: 480
 
     steps:
       - name: Checkout repository
@@ -113,12 +112,10 @@ jobs:
 
       - name: Validate input parameters
         run: |
-          # 验证源码分支有效性
           if ! [[ "${{ inputs.source_branch }}" =~ ^(openwrt-main|lede-master|immortalwrt-master)$ ]]; then
             echo "Invalid source_branch: ${{ inputs.source_branch }}"
             exit 1
           fi
-          # 验证内核版本格式
           if ! [[ "${{ inputs.openwrt_kernel }}" =~ ^[0-9]+\.[0-9]+\.y(_[0-9]+\.[0-9]+\.y)?$ ]]; then
             echo "Invalid kernel version: ${{ inputs.openwrt_kernel }}"
             exit 1
@@ -130,13 +127,11 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           echo "=== Cleaning up system ==="
-          # 深度清理系统冗余
           sudo docker rmi $(docker images -q) 2>/dev/null || true
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell 2>/dev/null
           sudo swapoff -a && sudo rm -f /swapfile /mnt/swapfile
           
           echo "=== Installing dependencies ==="
-          # 明确列出必要依赖（避免curl依赖列表失效）
           sudo apt-get update -y
           sudo apt-get install -y \
             build-essential clang flex bison g++ gawk gcc-multilib gettext \
@@ -146,7 +141,6 @@ jobs:
             libzstd-dev libpthread-stubs0-dev
           sudo apt-get autoremove -y && sudo apt-get clean
 
-          # 配置系统参数
           sudo timedatectl set-timezone "${TZ}"
           echo "MAX_JOBS=$(nproc)" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
@@ -155,14 +149,11 @@ jobs:
         if: steps.init.outputs.status == 'success'
         run: |
           echo "=== Expanding disk space ==="
-          # 计算可用空间并创建虚拟磁盘
           mnt_free=$(df -P /mnt | tail -1 | awk '{print $4}')
           root_free=$(df -P / | tail -1 | awk '{print $4}')
-          # 保留10%空间，其余用于编译
-          mnt_size=$((mnt_free * 9 / 10 / 1024))  # 转换为MB
+          mnt_size=$((mnt_free * 9 / 10 / 1024))
           root_size=$((root_free * 9 / 10 / 1024))
           
-          # 创建并挂载虚拟磁盘
           sudo truncate -s "${mnt_size}"M /mnt/mnt.img
           sudo truncate -s "${root_size}"M /root.img
           sudo losetup /dev/loop6 /mnt/mnt.img
@@ -191,7 +182,6 @@ jobs:
         if: steps.init.outputs.status == 'success'
         run: |
           echo "=== Cloning source code ==="
-          # 配置源码仓库
           case "${{ inputs.source_branch }}" in
             openwrt-main)
               REPO_URL="https://github.com/openwrt/openwrt"
@@ -210,16 +200,13 @@ jobs:
               ;;
           esac
 
-          # 克隆源码并创建链接
           git clone -q --single-branch --depth=1 --branch="${REPO_BRANCH}" "${REPO_URL}" openwrt
           ln -sf "${OPENWRT_DIR}" "${GITHUB_WORKSPACE}/openwrt"
           
-          # 初始化缓存目录
           mkdir -p "${CACHE_DIR}/dl" "${CACHE_DIR}/feeds"
           ln -sf "${CACHE_DIR}/dl" "${OPENWRT_DIR}/dl"
           ln -sf "${CACHE_DIR}/feeds" "${OPENWRT_DIR}/feeds"
 
-          # 输出构建信息
           build_tag="OpenWrt_${TAGS_NAME}_${{ inputs.openwrt_storage }}_$(date +"%Y.%m.%d")"
           echo "build_tag=${build_tag}" >> $GITHUB_OUTPUT
           echo "REPO_URL=${REPO_URL}" >> $GITHUB_OUTPUT
@@ -231,14 +218,12 @@ jobs:
         run: |
           echo "=== Loading custom configurations ==="
           cd "${OPENWRT_DIR}"
-          # 加载自定义feeds
           if [[ -f "${GITHUB_WORKSPACE}/${FEEDS_CONF}" ]]; then
             cp -f "${GITHUB_WORKSPACE}/${FEEDS_CONF}" feeds.conf.default
           else
             echo "Warning: Feeds config ${FEEDS_CONF} not found, using default"
           fi
           
-          # 执行第一阶段自定义脚本
           if [[ -f "${GITHUB_WORKSPACE}/${DIY_P1_SH}" ]]; then
             chmod +x "${GITHUB_WORKSPACE}/${DIY_P1_SH}"
             "${GITHUB_WORKSPACE}/${DIY_P1_SH}"
@@ -259,20 +244,17 @@ jobs:
         run: |
           echo "=== Applying custom configuration ==="
           cd "${OPENWRT_DIR}"
-          # 复制自定义文件
           if [[ -d "${GITHUB_WORKSPACE}/files" ]]; then
             cp -rf "${GITHUB_WORKSPACE}/files" .
           fi
           
-          # 加载配置文件
           if [[ -f "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]]; then
             cp -f "${GITHUB_WORKSPACE}/${CONFIG_FILE}" .config
           else
             echo "Warning: Config file ${CONFIG_FILE} not found, using default"
-            make defconfig
+          #  make defconfig
           fi
           
-          # 执行第二阶段自定义脚本
           if [[ -f "${GITHUB_WORKSPACE}/${DIY_P2_SH}" ]]; then
             chmod +x "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
             "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
@@ -280,7 +262,6 @@ jobs:
             echo "Warning: DIY script ${DIY_P2_SH} not found, skipping"
           fi
           
-          # 生成最终配置
           make defconfig
 
       - name: Download packages
@@ -291,9 +272,7 @@ jobs:
           cd "${OPENWRT_DIR}"
           make download -j${MAX_JOBS} || { echo "Failed to download packages"; exit 1; }
           
-          # 清理无效下载文件
           find dl -size -1024c -delete
-          # 检查下载完整性
           if [[ $(find dl -type f | wc -l) -eq 0 ]]; then
             echo "No packages downloaded"
             exit 1
@@ -306,16 +285,13 @@ jobs:
         run: |
           echo "=== Starting compilation ==="
           cd "${OPENWRT_DIR}"
-          # 记录编译开始时间
           start_time=$(date +%s)
           
-          # 编译策略：先多线程，失败则单线程带详细日志
           make -j${MAX_JOBS} || {
             echo "Multi-thread compile failed, trying single-thread"
-            make -j1 V=s  # 详细日志便于调试
+            make -j1 V=s
           }
           
-          # 检查编译结果
           if [[ -d "bin/targets" ]]; then
             echo "Compilation completed successfully"
             end_time=$(date +%s)
@@ -328,7 +304,7 @@ jobs:
 
       - name: Upload compile logs on failure
         if: failure() && steps.compile.conclusion == 'failure'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # 已更新为v4版本
         with:
           name: compile-logs
           path: |
@@ -342,12 +318,10 @@ jobs:
           echo "=== Preparing output files ==="
           cd "${OPENWRT_DIR}"
           mkdir -p output
-          # 收集输出文件
           find bin/targets -name "*rootfs.tar.gz" -exec cp {} output/ \;
           find bin/targets -name "*.img" -exec cp {} output/ \;
           cp -f .config output/build_config
           
-          # 生成校验文件
           cd output
           for file in *; do
             if [[ -f "$file" ]]; then
@@ -360,7 +334,7 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload intermediate artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # 已更新为v4版本
         if: steps.prepare_output.outputs.status == 'success'
         with:
           name: openwrt-raw-output
