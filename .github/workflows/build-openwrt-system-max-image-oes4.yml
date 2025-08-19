@@ -394,12 +394,12 @@ jobs:
           fi
 
       - name: Upload rootfs artifact
-        uses: actions/upload-artifact@v3
-        if: steps.package_rootfs.outputs.status == 'success'  # 仅当打包成功时上传
+        uses: actions/upload-artifact@v4  # 已更新为最新的 v4 版本
+        if: steps.package_rootfs.outputs.status == 'success'
         with:
           name: openwrt-rootfs
           path: /builder/openwrt/rootfs_artifact/
-          retention-days: 30  # 保留30天
+          retention-days: 30
 
       - name: Clear server space
         id: clean
