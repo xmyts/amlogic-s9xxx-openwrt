@@ -383,37 +383,65 @@ jobs:
           make -j$(($(nproc) + 1)) V=sc || make -j1 || make -j1 V=sc
           echo "status=success" >> ${GITHUB_OUTPUT}
 
+
+
+
+
+
       - name: Package and upload rootfs (even if compile failed)
         id: package_rootfs
-        if: always()  # 无论前面步骤成功与否，都执行此步骤
+        if: always()
         run: |
-          # 定义rootfs目录路径
-          ROOTFS_DIR="/builder/openwrt/staging_dir/target-aarch64_cortex-a73.cortex-a53_musl/root-amlogic"
-          # 定义打包输出目录
+          # 定义可能的rootfs目录路径
+          ROOTFS_DIRS=(
+            "/builder/openwrt/staging_dir/target-aarch64_cortex-a73.cortex-a53_musl/root-amlogic"
+            "/builder/openwrt/staging_dir/target-*/root-*"
+            "/builder/openwrt/build_dir/target-*/root-*"
+          )
+          
           OUTPUT_DIR="/builder/openwrt/rootfs_artifact"
           mkdir -p ${OUTPUT_DIR}
+          FOUND_ROOTFS=false
 
-          # 检查rootfs目录是否存在
-          if [ -d "${ROOTFS_DIR}" ]; then
-              echo "Found rootfs directory: ${ROOTFS_DIR}"
-              # 打包rootfs为tar（保留权限）
-              tar -cvpf ${OUTPUT_DIR}/openwrt_rootfs.tar -C ${ROOTFS_DIR} .
-              # 生成校验值
-              sha256sum ${OUTPUT_DIR}/openwrt_rootfs.tar > ${OUTPUT_DIR}/openwrt_rootfs.tar.sha256
-              echo "rootfs packaged successfully"
-              echo "status=success" >> ${GITHUB_OUTPUT}
+          # 检查可能的rootfs目录
+          for DIR in "${ROOTFS_DIRS[@]}"; do
+            # 使用通配符扩展
+            for expanded_dir in ${DIR}; do
+              if [ -d "${expanded_dir}" ]; then
+                echo "Found rootfs directory: ${expanded_dir}"
+                # 打包rootfs为tar（保留权限）
+                tar -cvpf ${OUTPUT_DIR}/openwrt_rootfs.tar -C ${expanded_dir} .
+                # 生成校验值
+                sha256sum ${OUTPUT_DIR}/openwrt_rootfs.tar > ${OUTPUT_DIR}/openwrt_rootfs.tar.sha256
+                echo "rootfs packaged successfully from ${expanded_dir}"
+                FOUND_ROOTFS=true
+                break 2  # 跳出两层循环
+              fi
+            done
+          done
+
+          if [ "${FOUND_ROOTFS}" = "true" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            # 列出打包的文件以确保它们存在
+            echo "Packaged files:"
+            ls -la ${OUTPUT_DIR}/
           else
-              echo "rootfs directory not found: ${ROOTFS_DIR}"
-              echo "status=failed" >> ${GITHUB_OUTPUT}
+            echo "No rootfs directory found in any expected location"
+            echo "Checked directories: ${ROOTFS_DIRS[@]}"
+            echo "status=failed" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload rootfs artifact
-        uses: actions/upload-artifact@v4  # 使用v4版本
-        if: steps.package_rootfs.outputs.status == 'success'
+        uses: actions/upload-artifact@v4
+        if: always() && steps.package_rootfs.outputs.status == 'success'
         with:
           name: openwrt-rootfs
-          path: /builder/openwrt/rootfs_artifact/
+          path: /builder/openwrt/rootfs_artifact/*
           retention-days: 15
+
+
+
+
 
       - name: Clear server space
         id: clean
