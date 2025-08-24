@@ -374,7 +374,7 @@ jobs:
         if: always()  # 无论前面步骤成功与否，都执行此步骤
         run: |
           # 定义rootfs目录路径
-          ROOTFS_DIR="/builder/openwrt/build_dir/target-aarch64_cortex-a73.cortex-a53_musl/root-amlogic"
+          ROOTFS_DIR="/builder/openwrt/staging_dir/target-aarch64_cortex-a73.cortex-a53_musl/root-amlogic"
           # 定义打包输出目录
           OUTPUT_DIR="/builder/openwrt/rootfs_artifact"
           mkdir -p ${OUTPUT_DIR}
@@ -466,3 +466,4 @@ jobs:
             - [${{ steps.codes.outputs.TAGS_NAME }}](${{ steps.codes.outputs.REPO_URL }})
             ### OpenWrt Image Verification
             - sha256sum
+
