@@ -24,7 +24,7 @@ rm -f package/feeds/luci/luci-app-gowebdav
 
 
 
-./scripts/feeds install -p smpackage luci-app-qbittorrent
+./scripts/feeds install -p qbittorrent luci-app-qbittorrent
 ./scripts/feeds install -p NueXini_Packages luci-app-gowebdav
 
 # ------------------------------------------------------------------------------------------------------------------------------
@@ -32,7 +32,7 @@ rm -f package/feeds/luci/luci-app-gowebdav
 
 
 # 克隆所需的包
-git clone https://github.com/jerrykuku/luci-app-jd-dailybonus package/luci-app-jd-dailybonus
-git clone https://github.com/esirplayground/luci-app-poweroff package/luci-app-poweroff
+# git clone https://github.com/jerrykuku/luci-app-jd-dailybonus package/luci-app-jd-dailybonus
+# git clone https://github.com/esirplayground/luci-app-poweroff package/luci-app-poweroff
 
 
