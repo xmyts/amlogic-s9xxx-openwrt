@@ -25,7 +25,7 @@ rm -f package/feeds/luci/luci-app-gowebdav
 
 
 ./scripts/feeds install -p smpackage qbittorrent qt6base qt6tools rblibtorrent luci-app-qbittorrent
-./scripts/feeds install -p NueXini_Packages luci-app-gowebdav
+#  ./scripts/feeds install -p NueXini_Packages luci-app-gowebdav
 
 # ------------------------------------------------------------------------------------------------------------------------------
 
