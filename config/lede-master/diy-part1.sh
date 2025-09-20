@@ -17,7 +17,8 @@
 
 # rm -rf package/lean/{samba4,luci-app-samba4,luci-app-ttyd}
 
-sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default 
+# sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default 
 # sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
-sed -i '$a src-git qbittorrent https://github.com/sbwml/luci-app-qbittorrent.git' feeds.conf.default
+ sed -i '$a src-git smpackage https://github.com/kenzok8/small-package' feeds.conf.default
+# sed -i '$a src-git qbittorrent https://github.com/sbwml/luci-app-qbittorrent.git' feeds.conf.default
 git clone https://github.com/noiver/luci-app-jd-dailybonus  package/luci-app-jd-dailybonus
