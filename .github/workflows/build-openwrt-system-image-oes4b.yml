@@ -356,7 +356,7 @@ jobs:
         id: package
         run: |
           cd openwrt/
-          # make olddefconfig
+           make olddefconfig
           make download -j8  V=1 2>&1 
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
@@ -485,6 +485,7 @@ jobs:
             ### OpenWrt Image Verification
 
             - sha256sum
+
 
 
 
