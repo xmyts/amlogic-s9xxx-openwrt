@@ -13,7 +13,7 @@
 # rm -rf package/emortal/{autosamba,ipv6-helper}
 
 # 更新软件包列表
-sudo apt update
+# sudo apt update
 
 # 安装 help2man
 # sudo apt install -y help2man
