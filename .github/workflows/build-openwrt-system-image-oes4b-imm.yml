@@ -356,7 +356,7 @@ jobs:
         id: package
         run: |
           cd openwrt/
-          # make defconfig
+           make defconfig
           make download -j8  V=sc 
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
@@ -483,4 +483,5 @@ jobs:
             ### OpenWrt source code
             - [${{ steps.codes.outputs.TAGS_NAME }}](${{ steps.codes.outputs.REPO_URL }})
             ### OpenWrt Image Verification
+
             - sha256sum
