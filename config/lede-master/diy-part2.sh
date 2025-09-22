@@ -20,7 +20,7 @@ rm -rf package/luci-app-amlogic
 # ------------------------------- Other ends -------------------------------
 
 rm -f package/feeds/luci/luci-app-qbittorrent
-./scripts/feeds install -p smpackage qbittorrent qt6base qt6tools rblibtorrent luci-app-qbittorrent
+./scripts/feeds install -p qbittorrent qbittorrent qt6base qt6tools rblibtorrent luci-app-qbittorrent	
 
 
 
