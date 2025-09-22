@@ -21,3 +21,16 @@
 # sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
 
 #sed -i '$a src-git qbittorrent https://github.com/sbwml/luci-app-qbittorrent.git' feeds.conf.default
+
+
+cat > target/linux/armsr/armv8/target.mk << 'EOF'
+ARCH:=aarch64
+SUBTARGET:=armv8
+BOARDNAME:=64-bit (armv8) machines
+CPU_TYPE:=cortex-a73
+CPU_CFLAGS_cortex-a73:=-mcpu=cortex-a73
+
+define Target/Description
+  Build multi-platform images for the ARMv8 instruction set architecture
+endef
+EOF
