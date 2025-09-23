@@ -21,11 +21,13 @@ echo "DISTRIB_SOURCECODE='immortalwrt'" >>package/base-files/files/etc/openwrt_r
 # ------------------------------- Main source ends -------------------------------
 
 # ------------------------------- Other started -------------------------------
-#
+# Add luci-app-amlogic
+rm -rf package/luci-app-amlogic
+ git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 
 # rm -f package/feeds/luci/luci-app-adguardhome
-#rm -f package/feeds/luci/luci-app-qbittorrent
-#./scripts/feeds install -p qbittorrent qbittorrent qt6base qt6tools rblibtorrent luci-app-qbittorrent
+rm -f package/feeds/luci/luci-app-qbittorrent
+./scripts/feeds install -p qbittorrent qbittorrent qt6base qt6tools rblibtorrent luci-app-qbittorrent
 
 # ./scripts/feeds install -p NueXini_Packages luci-app-adguardhome
 # ./scripts/feeds install -p NueXini_Packages luci-app-qbittorrent
