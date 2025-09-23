@@ -17,10 +17,12 @@
 
 # 安装 help2man
 # sudo apt install -y help2man
-# sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default 
+sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default 
+rm -rf feeds/NueXini_Packages/{qbittorrent,qt6base,qt6tools,rblibtorrent,luci-app-qbittorrent}
+
 # sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
 
-#sed -i '$a src-git qbittorrent https://github.com/sbwml/luci-app-qbittorrent.git' feeds.conf.default
+sed -i '$a src-git qbittorrent https://github.com/xmyts/luci-app-qbittorrent.git' feeds.conf.default
 
 
 cat > target/linux/armsr/armv8/target.mk << 'EOF'
