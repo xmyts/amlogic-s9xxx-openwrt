@@ -21,8 +21,20 @@
 # rm -rf feeds/NueXini_Packages/{qBittorrent,qBittorrent-static,qttools,qtbase,rblibtorrent,luci-app-qbittorrent}
 
 # sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
-
-sed -i '$a src-git qbittorrent https://github.com/xmyts/luci-app-qbittorrent.git' feeds.conf.default
+cat > feeds.conf.default << 'EOF'
+src-git packages https://github.com/immortalwrt/packages.git
+#src-git luci https://github.com/immortalwrt/luci.git
+src-git luci https://github.com/immortalwrt/luci.git;openwrt-23.05
+src-git routing https://github.com/openwrt/routing.git
+src-git telephony https://github.com/openwrt/telephony.git
+src-git video https://github.com/openwrt/video.git
+#src-git targets https://github.com/openwrt/targets.git
+#src-git oldpackages http://git.openwrt.org/packages.git
+#src-link custom /usr/src/openwrt/custom-feed
+#src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git
+src-git qbittorrent https://github.com/xmyts/luci-app-qbittorrent.git
+EOF
+# sed -i '$a src-git qbittorrent https://github.com/xmyts/luci-app-qbittorrent.git' feeds.conf.default
 
 
 cat > target/linux/armsr/armv8/target.mk << 'EOF'
