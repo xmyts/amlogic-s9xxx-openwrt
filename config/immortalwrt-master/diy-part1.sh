@@ -18,7 +18,7 @@
 # 安装 help2man
 # sudo apt install -y help2man
 sed -i '$a src-git NueXini_Packages https://github.com/NueXini/NueXini_Packages.git' feeds.conf.default 
-rm -rf feeds/NueXini_Packages/{qbittorrent,qt6base,qt6tools,rblibtorrent,luci-app-qbittorrent}
+rm -rf feeds/NueXini_Packages/{qBittorrent,qBittorrent-static,qttools,qtbase,rblibtorrent,luci-app-qbittorrent}
 
 # sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
 
