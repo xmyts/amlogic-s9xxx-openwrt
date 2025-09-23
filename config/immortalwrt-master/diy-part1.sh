@@ -23,8 +23,8 @@
 # sed -i '$a src-git small https://github.com/kenzok8/small' feeds.conf.default
 cat > feeds.conf.default << 'EOF'
 src-git packages https://github.com/immortalwrt/packages.git
-#src-git luci https://github.com/immortalwrt/luci.git
-src-git luci https://github.com/immortalwrt/luci.git;openwrt-23.05
+src-git luci https://github.com/immortalwrt/luci.git
+#src-git luci https://github.com/immortalwrt/luci.git;openwrt-23.05
 src-git routing https://github.com/openwrt/routing.git
 src-git telephony https://github.com/openwrt/telephony.git
 src-git video https://github.com/openwrt/video.git
