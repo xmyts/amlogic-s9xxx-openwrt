@@ -338,8 +338,20 @@ jobs:
           cd openwrt/
           ${GITHUB_WORKSPACE}/${DIY_P1_SH}
 
-      - name: Update feeds
-        run: cd openwrt/ && ./scripts/feeds update -a
+
+
+      - name: Update feeds and remove unwanted packages
+        run: |
+          # 进入 openwrt 目录
+          cd openwrt/
+          # 更新所有 feed 源（拉取 NueXini_Packages 内容）
+          ./scripts/feeds update -a
+          # 删除不需要的包（确保路径在 openwrt/ 下）
+          rm -rf feeds/NueXini_Packages/{qBittorrent,qBittorrent-static,qttools,qtbase,rblibtorrent,luci-app-qbittorrent}
+          # （可选）添加调试输出，确认删除结果
+          # echo "Check remaining packages in NueXini_Packages:"
+          # ls -l feeds/NueXini_Packages/ | grep -E "qBittorrent|qttools|rblibtorrent" || echo "Target packages already removed"
+
 
       - name: Install feeds
         run: cd openwrt/ && ./scripts/feeds install -a
@@ -356,7 +368,7 @@ jobs:
         id: package
         run: |
           cd openwrt/
-          # make olddefconfig
+          # make defconfig
           make download -j8  V=1 2>&1 
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
@@ -485,7 +497,6 @@ jobs:
             ### OpenWrt Image Verification
 
             - sha256sum
-
 
 
 
