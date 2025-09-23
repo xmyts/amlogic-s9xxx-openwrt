@@ -378,7 +378,7 @@ jobs:
         if: always()
         run: |
           # 定义rootfs目录路径
-          ROOTFS_DIR="/builder/openwrt/staging_dir/target-aarch64_generic_musl/root-armsr"
+          ROOTFS_DIR="/builder/openwrt/staging_dir/target-aarch64_cortex-a73_musl/root-armsr"
           # 定义打包输出目录
           OUTPUT_DIR="/builder/openwrt/rootfs_artifact"
           mkdir -p ${OUTPUT_DIR}
@@ -485,4 +485,5 @@ jobs:
             ### OpenWrt Image Verification
 
             - sha256sum
+
 
