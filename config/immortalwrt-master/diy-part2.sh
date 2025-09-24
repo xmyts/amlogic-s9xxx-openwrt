@@ -27,7 +27,7 @@ rm -rf package/luci-app-amlogic
 
 # rm -f package/feeds/luci/luci-app-adguardhome
 rm -f package/feeds/luci/luci-app-qbittorrent
-./scripts/feeds install -p qbittorrent qbittorrent qt6base qt6tools rblibtorrent luci-app-qbittorrent
+./scripts/feeds install -a -p qbittorrent
 
 # ./scripts/feeds install -p NueXini_Packages luci-app-adguardhome
 # ./scripts/feeds install -p NueXini_Packages luci-app-qbittorrent
