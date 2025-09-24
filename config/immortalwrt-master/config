@@ -140,17 +140,8 @@ CONFIG_ARCH="aarch64"
 #
 # Target Images
 #
-CONFIG_TARGET_ROOTFS_INITRAMFS=y
-CONFIG_TARGET_INITRAMFS_COMPRESSION_NONE=y
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_GZIP is not set
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_BZIP2 is not set
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_LZMA is not set
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_LZO is not set
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_LZ4 is not set
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_XZ is not set
-# CONFIG_TARGET_INITRAMFS_COMPRESSION_ZSTD is not set
+# CONFIG_TARGET_ROOTFS_INITRAMFS is not set
 CONFIG_EXTERNAL_CPIO=""
-# CONFIG_TARGET_INITRAMFS_FORCE is not set
 
 #
 # Root filesystem archives
@@ -437,7 +428,7 @@ CONFIG_USE_MUSL=y
 CONFIG_SSP_SUPPORT=y
 CONFIG_BINUTILS_VERSION_2_42=y
 CONFIG_BINUTILS_VERSION="2.42"
-CONFIG_GCC_VERSION="14.3.0"
+CONFIG_GCC_VERSION="13.3.0"
 CONFIG_GCC_USE_DEFAULT_VERSION=y
 CONFIG_LIBC="musl"
 CONFIG_TARGET_SUFFIX="musl"
@@ -453,9 +444,9 @@ CONFIG_TARGET_PREINIT_TIMEOUT=4
 # CONFIG_TARGET_PREINIT_SHOW_NETMSG is not set
 # CONFIG_TARGET_PREINIT_SUPPRESS_FAILSAFE_NETMSG is not set
 CONFIG_TARGET_PREINIT_IFNAME=""
-CONFIG_TARGET_PREINIT_IP="192.168.1.1"
+CONFIG_TARGET_PREINIT_IP="192.168.10.15"
 CONFIG_TARGET_PREINIT_NETMASK="255.255.255.0"
-CONFIG_TARGET_PREINIT_BROADCAST="192.168.1.255"
+CONFIG_TARGET_PREINIT_BROADCAST="192.168.10.255"
 # CONFIG_INITOPT is not set
 CONFIG_TARGET_INIT_PATH="/usr/sbin:/usr/bin:/sbin:/bin"
 CONFIG_TARGET_INIT_ENV=""
@@ -1860,7 +1851,7 @@ CONFIG_NETJSON_MONITORING_IWINFO=y
 # Boot Loaders
 #
 # CONFIG_PACKAGE_grub2-efi-arm is not set
-CONFIG_PACKAGE_u-boot-qemu_armv8=y
+# CONFIG_PACKAGE_u-boot-qemu_armv8 is not set
 # end of Boot Loaders
 
 #
@@ -3837,7 +3828,7 @@ CONFIG_PACKAGE_perlbase-xsloader=y
 #
 # Python
 #
-CONFIG_PACKAGE_libpython3=y
+# CONFIG_PACKAGE_libpython3 is not set
 # CONFIG_PACKAGE_micropython-lib is not set
 # CONFIG_PACKAGE_micropython-lib-src is not set
 # CONFIG_PACKAGE_micropython-lib-unix is not set
@@ -3867,8 +3858,7 @@ CONFIG_PACKAGE_libpython3=y
 # CONFIG_PACKAGE_python3-awesomeversion is not set
 # CONFIG_PACKAGE_python3-awscli is not set
 # CONFIG_PACKAGE_python3-babel is not set
-CONFIG_PACKAGE_python3-base=y
-# CONFIG_PACKAGE_python3-base-src is not set
+# CONFIG_PACKAGE_python3-base is not set
 # CONFIG_PACKAGE_python3-bcrypt is not set
 # CONFIG_PACKAGE_python3-bidict is not set
 # CONFIG_PACKAGE_python3-ble2mqtt is not set
@@ -5038,35 +5028,35 @@ CONFIG_boost-libs-all=y
 CONFIG_boost-test-pkg=y
 CONFIG_boost-graph-parallel=y
 CONFIG_PACKAGE_boost-atomic=y
-CONFIG_PACKAGE_boost-charconv=y
+# CONFIG_PACKAGE_boost-charconv is not set
 CONFIG_PACKAGE_boost-chrono=y
-CONFIG_PACKAGE_boost-cobalt=y
+# CONFIG_PACKAGE_boost-cobalt is not set
 CONFIG_PACKAGE_boost-container=y
 CONFIG_PACKAGE_boost-context=y
-CONFIG_PACKAGE_boost-contract=y
+# CONFIG_PACKAGE_boost-contract is not set
 CONFIG_PACKAGE_boost-coroutine=y
 CONFIG_PACKAGE_boost-date_time=y
 CONFIG_PACKAGE_boost-fiber=y
 CONFIG_PACKAGE_boost-filesystem=y
 CONFIG_PACKAGE_boost-graph=y
-CONFIG_PACKAGE_boost-iostreams=y
-CONFIG_PACKAGE_boost-json=y
-CONFIG_PACKAGE_boost-locale=y
-CONFIG_PACKAGE_boost-log=y
-CONFIG_PACKAGE_boost-math=y
-CONFIG_PACKAGE_boost-nowide=y
-CONFIG_PACKAGE_boost-program_options=y
-CONFIG_PACKAGE_boost-python3=y
-CONFIG_PACKAGE_boost-random=y
-CONFIG_PACKAGE_boost-regex=y
-CONFIG_PACKAGE_boost-serialization=y
-CONFIG_PACKAGE_boost-wserialization=y
-CONFIG_PACKAGE_boost-stacktrace=y
+# CONFIG_PACKAGE_boost-iostreams is not set
+# CONFIG_PACKAGE_boost-json is not set
+# CONFIG_PACKAGE_boost-locale is not set
+# CONFIG_PACKAGE_boost-log is not set
+# CONFIG_PACKAGE_boost-math is not set
+# CONFIG_PACKAGE_boost-nowide is not set
+# CONFIG_PACKAGE_boost-program_options is not set
+# CONFIG_PACKAGE_boost-python3 is not set
+# CONFIG_PACKAGE_boost-random is not set
+# CONFIG_PACKAGE_boost-regex is not set
+# CONFIG_PACKAGE_boost-serialization is not set
+# CONFIG_PACKAGE_boost-wserialization is not set
+# CONFIG_PACKAGE_boost-stacktrace is not set
 CONFIG_PACKAGE_boost-thread=y
 CONFIG_PACKAGE_boost-timer=y
-CONFIG_PACKAGE_boost-type_erasure=y
-CONFIG_PACKAGE_boost-url=y
-CONFIG_PACKAGE_boost-wave=y
+# CONFIG_PACKAGE_boost-type_erasure is not set
+# CONFIG_PACKAGE_boost-url is not set
+# CONFIG_PACKAGE_boost-wave is not set
 # end of Select Boost libraries
 
 # CONFIG_PACKAGE_boost-libs is not set
@@ -5093,7 +5083,7 @@ CONFIG_PACKAGE_glib2=y
 # CONFIG_PACKAGE_hidapi is not set
 # CONFIG_PACKAGE_ibrcommon is not set
 # CONFIG_PACKAGE_ibrdtn is not set
-CONFIG_PACKAGE_icu=y
+# CONFIG_PACKAGE_icu is not set
 # CONFIG_PACKAGE_icu-data-tools is not set
 # CONFIG_PACKAGE_icu-full-data is not set
 # CONFIG_PACKAGE_iniparser is not set
@@ -5560,6 +5550,7 @@ CONFIG_PACKAGE_libxml2=y
 # CONFIG_PACKAGE_protobuf is not set
 # CONFIG_PACKAGE_protobuf-lite is not set
 # CONFIG_PACKAGE_pthsem is not set
+CONFIG_PACKAGE_rblibtorrent=y
 # CONFIG_PACKAGE_re2 is not set
 CONFIG_PACKAGE_rpcd-mod-luci=y
 # CONFIG_PACKAGE_rpcd-mod-rad2-enc is not set
@@ -6481,6 +6472,7 @@ CONFIG_PACKAGE_luci-i18n-vlmcsd-zh-cn=y
 #
 # CONFIG_PACKAGE_mktorrent is not set
 # CONFIG_PACKAGE_opentracker is not set
+CONFIG_PACKAGE_qbittorrent=y
 # CONFIG_PACKAGE_qbittorrent-enhanced-edition is not set
 # CONFIG_PACKAGE_rtorrent is not set
 # CONFIG_PACKAGE_rtorrent-rpc is not set
