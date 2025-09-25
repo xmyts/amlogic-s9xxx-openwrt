@@ -347,14 +347,14 @@ jobs:
           # 更新所有 feed 源（拉取 NueXini_Packages 内容）
           ./scripts/feeds update -a
           # 删除不需要的包（确保路径在 openwrt/ 下）
-          rm -rf feeds/NueXini_Packages/{qBittorrent,qBittorrent-static,qttools,qtbase,rblibtorrent,luci-app-qbittorrent}
+          # rm -rf feeds/NueXini_Packages/{qBittorrent,qBittorrent-static,qttools,qtbase,rblibtorrent,luci-app-qbittorrent}
           # 删除lede源码中feeds自带qbittorrent
-          rm -rf feeds/luci/applications/luci-app-qbittorrent
-          rm -rf feeds/packages/net/{qBittorrent,qBittorrent-static}
-          rm -rf feeds/packages/libs/{rblibtorrent,qtbase,qttools}
+          # rm -rf feeds/luci/applications/luci-app-qbittorrent
+          # rm -rf feeds/packages/net/{qBittorrent,qBittorrent-static}
+          # rm -rf feeds/packages/libs/{rblibtorrent,qtbase,qttools}
           # 校验删除结果
-          echo "Check remaining packages:"
-          find feeds/ -name "*qBittorrent*" -o -name "*rblibtorrent*" -o -name "*qtbase*" -o -name "*qttools*" || echo "All target packages removed"
+          # echo "Check remaining packages:"
+          # find feeds/ -name "*qBittorrent*" -o -name "*rblibtorrent*" -o -name "*qtbase*" -o -name "*qttools*" || echo "All target packages removed"
 
 
       - name: Install feeds
@@ -501,6 +501,7 @@ jobs:
             ### OpenWrt Image Verification
 
             - sha256sum
+
 
 
 
