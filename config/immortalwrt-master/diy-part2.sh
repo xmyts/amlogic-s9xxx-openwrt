@@ -26,8 +26,8 @@ rm -rf package/luci-app-amlogic
  git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 
 # rm -f package/feeds/luci/luci-app-adguardhome
-rm -f package/feeds/luci/luci-app-qbittorrent
-./scripts/feeds install -a -p qbittorrent
+# rm -f package/feeds/luci/luci-app-qbittorrent
+# ./scripts/feeds install -a -p qbittorrent
 
 # ./scripts/feeds install -p NueXini_Packages luci-app-adguardhome
 # ./scripts/feeds install -p NueXini_Packages luci-app-qbittorrent
