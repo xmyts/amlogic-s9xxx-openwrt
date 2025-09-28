@@ -43,7 +43,7 @@ ARCH:=aarch64
 SUBTARGET:=armv8
 BOARDNAME:=64-bit (armv8) machines
 CPU_TYPE:=cortex-a73
-CPU_CFLAGS_cortex-a73:=-march=armv8-a+crypto+simd+crc -mtune=cortex-a73 -O2
+CPU_CFLAGS_cortex-a73:=-march=armv8-a+crypto+simd+crc -mtune=cortex-a73
 
 define Target/Description
   Build multi-platform images for the ARMv8 instruction set architecture
