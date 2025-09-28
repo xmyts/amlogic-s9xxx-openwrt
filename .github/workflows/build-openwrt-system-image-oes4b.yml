@@ -382,7 +382,7 @@ jobs:
         run: |
           cd openwrt/
           echo -e "$(nproc) thread compile"
-          make -j$(($(nproc) + 1)) V=1 2>&1 || make -j1 || make -j1 V=sc
+          make -j$(($(nproc) + 1)) V=sc 2>&1 || make -j1 || make -j1 V=sc
           echo "status=success" >> $GITHUB_OUTPUT
 
 
@@ -394,7 +394,7 @@ jobs:
         if: always()
         run: |
           # 定义rootfs目录路径
-          ROOTFS_DIR="/builder/openwrt/staging_dir/target-aarch64_cortex-a73.cortex-a53_musl/root-amlogic"
+          ROOTFS_DIR="/builder/openwrt/build_dir/target-aarch64_cortex-a73_musl/root-armsr"
           # 定义打包输出目录
           OUTPUT_DIR="/builder/openwrt/rootfs_artifact"
           mkdir -p ${OUTPUT_DIR}
@@ -501,6 +501,7 @@ jobs:
             ### OpenWrt Image Verification
 
             - sha256sum
+
 
 
 
