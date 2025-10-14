@@ -33,7 +33,7 @@ rm -rf package/luci-app-amlogic
 
 
 # 克隆所需的包
-git clone https://github.com/jerrykuku/luci-app-jd-dailybonus package/luci-app-jd-dailybonus
+# git clone https://github.com/jerrykuku/luci-app-jd-dailybonus package/luci-app-jd-dailybonus
 # git clone https://github.com/esirplayground/luci-app-poweroff package/luci-app-poweroff
 
 
