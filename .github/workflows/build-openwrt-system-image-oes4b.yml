@@ -383,7 +383,7 @@ jobs:
         run: |
           cd openwrt/
           # 关键：设置TARGET_CFLAGS，包含-O2优化和A311D支持的指令集
-          export TARGET_CFLAGS="-O3"
+          export TARGET_CFLAGS="-O2"
           # 打印参数验证（可选，方便日志排查）
           # echo "当前编译参数：TARGET_CFLAGS=$TARGET_CFLAGS"
           # 开始编译（原逻辑不变）
@@ -505,6 +505,7 @@ jobs:
             ### OpenWrt Image Verification
 
             - sha256sum
+
 
 
 
