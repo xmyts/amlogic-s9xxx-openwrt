@@ -407,7 +407,7 @@ jobs:
         if: always()
         run: |
           # 定义IPK目录路径
-          IPK_DIR="/builder/openwrt/bin/packages/aarch64_cortex-a73.cortex-a53"
+          IPK_DIR="/builder/openwrt/bin"
           # 定义打包输出目录
           OUTPUT_DIR="/builder/openwrt/ipk_artifact"
           mkdir -p ${OUTPUT_DIR}
